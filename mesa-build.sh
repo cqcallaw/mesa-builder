@@ -87,7 +87,7 @@ EOF
 	sudo schroot -c $2 -- sh -c "ninja -C $BUILD_DIR install"
 
 	# deploy
-	sudo cp -vr "${SCHROOT_PATH}${INSTALL_DIR}" "$INSTALL_DIR"
+	sudo cp -Tvr "${SCHROOT_PATH}${INSTALL_DIR}" "$INSTALL_DIR"
 }
 
 build_mesa "amd64" "${CODENAME}64" "linux"

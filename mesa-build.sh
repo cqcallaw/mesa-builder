@@ -79,6 +79,7 @@ EOF
 	sudo schroot -c $2 -- sh -c "update-alternatives --install /usr/bin/llvm-config llvm-config /usr/lib/llvm-15/bin/llvm-config 200"
 
 	# do the build
+	cd $SRC_DIR
 	BUILD_DIR=build-$BUILD_ID/$1
 	mkdir -p $BUILD_DIR
 	sudo schroot -c $2 -- sh -c "meson setup $BUILD_DIR $BUILD_OPTS --prefix=$INSTALL_DIR"

@@ -91,6 +91,3 @@ EOF
 
 build_mesa "amd64" "${CODENAME}64" "linux"
 build_mesa "i386" "${CODENAME}32" "linux32"
-
-# update linker cache
-sudo ldconfig

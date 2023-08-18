@@ -6,6 +6,20 @@ set -x # echo commands
 BUILD_OPTS="-Dglvnd=true"
 SRC_DIR=$HOME/src/mesa
 
+# list of arguments expected in the input
+BUILD_PERFETTO=false
+
+while getopts p flag
+do
+    case "${flag}" in
+        p) BUILD_PERFETTO=true;;
+    ?)
+      echo "Invalid option: -${OPTARG}."
+      exit 2
+      ;;
+    esac
+done
+
 CODENAME=$(lsb_release --codename --short)
 # make sure source is available
 if [ ! -d "$SRC_DIR" ]; then
@@ -26,6 +40,12 @@ fi
 
 # configure execution-wide state
 BUILD_ID=`git -C $SRC_DIR describe --always --tags`
+
+if $BUILD_PERFETTO; then
+	BUILD_OPTS="$BUILD_OPTS -Dperfetto=true"
+	BUILD_ID="$BUILD_ID+perfetto"
+fi
+
 INSTALL_DIR=/usr/local-$BUILD_ID
 
 build_mesa() {
@@ -70,21 +90,21 @@ EOF
 	sudo schroot -c $2 apt update
 	# "-- sh -c" required to pass arguments to chroot correctly
 	# ref: https://stackoverflow.com/a/3074544
-	sudo schroot -c $2 -- sh -c "apt -y --fix-broken install" # sometimes required for initial setup
-	sudo schroot -c $2 -- sh -c "apt -y upgrade"
-	sudo schroot -c $2 -- sh -c "apt -y build-dep mesa"
-	sudo schroot -c $2 -- sh -c "apt -y install git llvm llvm-15"
+	schroot -c $2 -- sh -c "sudo apt -y --fix-broken install" # sometimes required for initial setup
+	schroot -c $2 -- sh -c "sudo apt -y upgrade"
+	schroot -c $2 -- sh -c "sudo apt -y build-dep mesa"
+	schroot -c $2 -- sh -c "sudo apt -y install git llvm llvm-15"
 
 	# Contemporary Mesa requires LLVM 15. Make sure it's available
-	sudo schroot -c $2 -- sh -c "update-alternatives --install /usr/bin/llvm-config llvm-config /usr/lib/llvm-15/bin/llvm-config 200"
+	schroot -c $2 -- sh -c "sudo update-alternatives --install /usr/bin/llvm-config llvm-config /usr/lib/llvm-15/bin/llvm-config 200"
 
 	# do the build
 	cd $SRC_DIR
 	BUILD_DIR=build-$BUILD_ID/$1
 	mkdir -p $BUILD_DIR
-	sudo schroot -c $2 -- sh -c "meson setup $BUILD_DIR $BUILD_OPTS --prefix=$INSTALL_DIR"
-	sudo schroot -c $2 -- sh -c "ninja -C $BUILD_DIR"
-	sudo schroot -c $2 -- sh -c "ninja -C $BUILD_DIR install"
+	schroot -c $2 -- sh -c "meson setup $BUILD_DIR $BUILD_OPTS --prefix=$INSTALL_DIR"
+	schroot -c $2 -- sh -c "ninja -C $BUILD_DIR"
+	schroot -c $2 -- sh -c "sudo ninja -C $BUILD_DIR install"
 
 	# deploy
 	sudo cp -Tvr "${SCHROOT_PATH}${INSTALL_DIR}" "$INSTALL_DIR"
@@ -92,3 +112,11 @@ EOF
 
 build_mesa "amd64" "${CODENAME}64" "linux"
 build_mesa "i386" "${CODENAME}32" "linux32"
+
+if $BUILD_PERFETTO; then
+	# ref: https://docs.mesa3d.org/perfetto.html
+	cd $SRC_DIR/subprojects/perfetto
+	./tools/install-build-deps
+	./tools/gn gen --args='is_debug=false' out/linux
+	./tools/ninja -C out/linux
+fi

@@ -5,7 +5,7 @@ set -x # echo commands
 
 BUILD_OPTS="-Dglvnd=true"
 SRC_DIR=$HOME/src/mesa
-PACKAGE_MIRROR=$PACKAGE_MIRROR
+PACKAGE_MIRROR="http://archive.ubuntu.com/ubuntu"
 
 # list of arguments expected in the input
 BUILD_PERFETTO=false
@@ -68,14 +68,14 @@ build_mesa() {
 	# create minimum viable apt sources
 	# ref: https://stackoverflow.com/questions/17487872/shell-writing-many-lines-in-a-file-as-sudo
 	sudo sh -c "cat > $SCHROOT_PATH/etc/apt/sources.list" << EOF
-deb $PACKAGE_MIRROR $CODENAME universe restricted main multiverse
-deb $PACKAGE_MIRROR ${CODENAME}-updates universe restricted main multiverse
-deb $PACKAGE_MIRROR ${CODENAME}-backports universe restricted main multiverse
-deb $PACKAGE_MIRROR ${CODENAME}-security universe restricted main multiverse
-deb-src $PACKAGE_MIRROR $CODENAME universe restricted main multiverse
-deb-src $PACKAGE_MIRROR ${CODENAME}-updates universe restricted main multiverse
-deb-src $PACKAGE_MIRROR ${CODENAME}-backports universe restricted main multiverse
-deb-src $PACKAGE_MIRROR ${CODENAME}-security universe restricted main multiverse
+deb ${PACKAGE_MIRROR} ${CODENAME} universe restricted main multiverse
+deb ${PACKAGE_MIRROR} ${CODENAME}-updates universe restricted main multiverse
+deb ${PACKAGE_MIRROR} ${CODENAME}-backports universe restricted main multiverse
+deb ${PACKAGE_MIRROR} ${CODENAME}-security universe restricted main multiverse
+deb-src ${PACKAGE_MIRROR} $CODENAME universe restricted main multiverse
+deb-src ${PACKAGE_MIRROR} ${CODENAME}-updates universe restricted main multiverse
+deb-src ${PACKAGE_MIRROR} ${CODENAME}-backports universe restricted main multiverse
+deb-src ${PACKAGE_MIRROR} ${CODENAME}-security universe restricted main multiverse
 EOF
 
 	echo "Configuring chroot..."

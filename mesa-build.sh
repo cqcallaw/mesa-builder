@@ -3,9 +3,21 @@
 set -e # terminate on errors
 set -x # echo commands
 
-BUILD_OPTS="-Dglvnd=true"
-SRC_DIR=$HOME/src/mesa
-PACKAGE_MIRROR="http://archive.ubuntu.com/ubuntu"
+if [ -z "$BUILD_OPTS" ]; then
+	BUILD_OPTS="-Dglvnd=true"
+fi
+
+if [ -z "$SRC_DIR" ]; then
+	SRC_DIR="$HOME/src/mesa"
+fi
+
+if [ -z "$SUITE" ]; then
+	SUITE=$(lsb_release --codename --short)
+fi
+
+if [ -z "$PACKAGE_MIRROR" ]; then
+	PACKAGE_MIRROR="http://archive.ubuntu.com/ubuntu"
+fi
 
 # list of arguments expected in the input
 BUILD_PERFETTO=false
@@ -21,7 +33,6 @@ do
     esac
 done
 
-CODENAME=$(lsb_release --codename --short)
 # make sure source is available
 if [ ! -d "$SRC_DIR" ]; then
     mkdir -p $SRC_DIR
@@ -47,35 +58,37 @@ if $BUILD_PERFETTO; then
 	BUILD_ID="$BUILD_ID+perfetto"
 fi
 
-INSTALL_DIR=/usr/local-$BUILD_ID
+if [ -z "$INSTALL_DIR" ]; then
+	INSTALL_DIR=/usr/local-$BUILD_ID
+fi
 
 build_mesa() {
 	# $1: The schroot architecure
 	# $2: The name of the schroot environment
 	# $3: The schroot personality
 	# ref: https://unix.stackexchange.com/questions/12956/how-do-i-run-32-bit-programs-on-a-64-bit-debian-ubuntu
-	SCHROOT_PATH="/build/$CODENAME/$1"
+	SCHROOT_PATH="/build/$SUITE/$1"
 	
 	sudo apt -y install schroot debootstrap
 	sudo mkdir -p $SCHROOT_PATH
 
 	echo "Bootstrapping environment..."
 	set +e # debootstrap will return non-zero if the environment has been previously provisioned
-	sudo debootstrap --arch $1 $CODENAME $SCHROOT_PATH $PACKAGE_MIRROR
+	sudo debootstrap --arch $1 $SUITE $SCHROOT_PATH $PACKAGE_MIRROR
 	set -e
 
 	echo "Configuring apt..."
 	# create minimum viable apt sources
 	# ref: https://stackoverflow.com/questions/17487872/shell-writing-many-lines-in-a-file-as-sudo
 	sudo sh -c "cat > $SCHROOT_PATH/etc/apt/sources.list" << EOF
-deb ${PACKAGE_MIRROR} ${CODENAME} universe restricted main multiverse
-deb ${PACKAGE_MIRROR} ${CODENAME}-updates universe restricted main multiverse
-deb ${PACKAGE_MIRROR} ${CODENAME}-backports universe restricted main multiverse
-deb ${PACKAGE_MIRROR} ${CODENAME}-security universe restricted main multiverse
-deb-src ${PACKAGE_MIRROR} $CODENAME universe restricted main multiverse
-deb-src ${PACKAGE_MIRROR} ${CODENAME}-updates universe restricted main multiverse
-deb-src ${PACKAGE_MIRROR} ${CODENAME}-backports universe restricted main multiverse
-deb-src ${PACKAGE_MIRROR} ${CODENAME}-security universe restricted main multiverse
+deb ${PACKAGE_MIRROR} ${SUITE} universe restricted main multiverse
+deb ${PACKAGE_MIRROR} ${SUITE}-updates universe restricted main multiverse
+deb ${PACKAGE_MIRROR} ${SUITE}-backports universe restricted main multiverse
+deb ${PACKAGE_MIRROR} ${SUITE}-security universe restricted main multiverse
+deb-src ${PACKAGE_MIRROR} $SUITE universe restricted main multiverse
+deb-src ${PACKAGE_MIRROR} ${SUITE}-updates universe restricted main multiverse
+deb-src ${PACKAGE_MIRROR} ${SUITE}-backports universe restricted main multiverse
+deb-src ${PACKAGE_MIRROR} ${SUITE}-security universe restricted main multiverse
 EOF
 
 	echo "Configuring chroot..."
@@ -111,8 +124,8 @@ EOF
 	sudo cp -Tvr "${SCHROOT_PATH}${INSTALL_DIR}" "$INSTALL_DIR"
 }
 
-build_mesa "amd64" "${CODENAME}64" "linux"
-build_mesa "i386" "${CODENAME}32" "linux32"
+build_mesa "amd64" "${SUITE}64" "linux"
+build_mesa "i386" "${SUITE}32" "linux32"
 
 if $BUILD_PERFETTO; then
 	# ref: https://docs.mesa3d.org/perfetto.html

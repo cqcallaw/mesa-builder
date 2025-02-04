@@ -107,8 +107,10 @@ EOF
 	schroot -c $2 -- sh -c "sudo apt -y --fix-broken install" # sometimes required for initial setup
 	schroot -c $2 -- sh -c "sudo apt -y upgrade"
 	schroot -c $2 -- sh -c "sudo apt -y build-dep mesa"
-	schroot -c $2 -- sh -c "sudo apt -y install git llvm llvm-15"
+	schroot -c $2 -- sh -c "sudo apt -y install git"
 
+	# Handle LLVM
+	schroot -c $2 -- sh -c "sudo apt -y install llvm llvm-15"
 	# Contemporary Mesa requires LLVM 15. Make sure it's available
 	schroot -c $2 -- sh -c "sudo update-alternatives --install /usr/bin/llvm-config llvm-config /usr/lib/llvm-15/bin/llvm-config 200"
 

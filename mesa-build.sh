@@ -33,10 +33,19 @@ do
     esac
 done
 
+
 # make sure source is available
 if [ ! -d "$SRC_DIR" ]; then
     mkdir -p $SRC_DIR
 fi
+
+# Various settings
+SPIRV_TOOLS_TAG="v2024.4.rc2"
+SPIRV_HEADERS_TAG="vulkan-sdk-1.4.304.0"
+SPIRV_TOOLS_SRC_URL="https://github.com/KhronosGroup/SPIRV-Tools.git"
+SPIRV_TOOLS_SRC_DIR="$HOME/src/spirv-tools"
+SPIRV_HEADERS_SRC_URL="https://github.com/KhronosGroup/SPIRV-Headers.git"
+SPIRV_HEADERS_SRC_DIR="$SPIRV_TOOLS_SRC_DIR/external/spirv-headers"
 
 set +e # allow errors temporarily
 git -C $SRC_DIR rev-parse 2>/dev/null
@@ -120,6 +129,22 @@ EOF
 	schroot -c $2 -p -- sh -c "rustup update stable"
 	schroot -c $2 -- sh -c "rustup default stable"
 
+	# Handle SPIR-V tools
+	SPIRV_BUILD_DIR="$SPIRV_TOOLS_SRC_DIR/build-$SPIRV_TOOLS_TAG/$1"
+	schroot -c $2 -- sh -c "sudo apt -y install cmake"
+	schroot -c $2 -- sh -c "git -C $SPIRV_TOOLS_SRC_DIR pull origin main || git clone $SPIRV_TOOLS_SRC_URL $SPIRV_TOOLS_SRC_DIR"
+	schroot -c $2 -- sh -c "git -C $SPIRV_TOOLS_SRC_DIR fetch --tags"
+	schroot -c $2 -- sh -c "git -C $SPIRV_TOOLS_SRC_DIR checkout $SPIRV_TOOLS_TAG"
+	schroot -c $2 -- sh -c "git -C $SPIRV_HEADERS_SRC_DIR pull origin main || git clone $SPIRV_HEADERS_SRC_URL $SPIRV_HEADERS_SRC_DIR"
+	schroot -c $2 -- sh -c "git -C $SPIRV_HEADERS_SRC_DIR fetch --tags"
+	schroot -c $2 -- sh -c "git -C $SPIRV_HEADERS_SRC_DIR checkout $SPIRV_HEADERS_TAG"
+	# Configure
+	schroot -c $2 -- sh -c "cmake -B$SPIRV_BUILD_DIR -H$SPIRV_TOOLS_SRC_DIR -DCMAKE_INSTALL_PREFIX=$INSTALL_DIR"
+	# Build
+	schroot -c $2 -- sh -c "CMAKE_CXX_FLAGS=-m32 LINK_FLAGS=-m32 cmake --build $SPIRV_BUILD_DIR --parallel `nproc`"
+	# Install
+	schroot -c $2 -- sh -c "sudo cmake --build $SPIRV_BUILD_DIR --target install"
+
 	# do the build
 	cd $SRC_DIR
 	BUILD_DIR=build-$BUILD_ID/$1
@@ -145,3 +170,4 @@ if $BUILD_PERFETTO; then
 	./tools/gn gen --args='is_debug=false' out/linux
 	./tools/ninja -C out/linux
 fi
+

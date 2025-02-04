@@ -124,6 +124,9 @@ EOF
 	cd $SRC_DIR
 	BUILD_DIR=build-$BUILD_ID/$1
 	mkdir -p $BUILD_DIR
+	schroot -c $2 -- sh -c "rm -rf subprojects/libdrm.wrap"
+	schroot -c $2 -- sh -c "meson wrap install libdrm"
+
 	schroot -c $2 -- sh -c "meson setup $BUILD_DIR $BUILD_OPTS --prefix=$INSTALL_DIR"
 	schroot -c $2 -- sh -c "ninja -C $BUILD_DIR"
 	schroot -c $2 -- sh -c "sudo ninja -C $BUILD_DIR install"

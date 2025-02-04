@@ -94,7 +94,7 @@ EOF
 	echo "Configuring chroot..."
 	sudo sh -c "cat > /etc/schroot/chroot.d/$2" << EOF
 [$2]
-description=64b Mesa Build Env
+description=Mesa Build Env
 directory=$SCHROOT_PATH
 type=directory
 personality=$3

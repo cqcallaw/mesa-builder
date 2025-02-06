@@ -3,34 +3,51 @@
 set -e # terminate on errors
 set -x # echo commands
 
-if [ -z "$BUILD_OPTS" ]; then
-	BUILD_OPTS="-Dglvnd=true -Dvalgrind=disabled -Dvulkan-layers=device-select,intel-nullhw,overlay,screenshot"
-fi
-
-if [ -z "$SRC_DIR" ]; then
-	SRC_DIR="$HOME/src/mesa"
-fi
-
-if [ -z "$SUITE" ]; then
-	SUITE=$(lsb_release --codename --short)
-fi
-
-if [ -z "$PACKAGE_MIRROR" ]; then
-	PACKAGE_MIRROR="http://archive.ubuntu.com/ubuntu"
-fi
-
-# list of arguments expected in the input
+SUITE=$(lsb_release --codename --short)
+SRC_DIR="$HOME/src/mesa"
+BUILD_OPTS="-Dglvnd=true -Dvalgrind=disabled -Dvulkan-layers=device-select,intel-nullhw,overlay,screenshot"
+PACKAGE_MIRROR="http://archive.ubuntu.com/ubuntu"
 BUILD_PERFETTO=false
+SPIRV_TOOLS_TAG="v2024.4.rc2"
+SPIRV_HEADERS_TAG="vulkan-sdk-1.4.304.0"
+REV=''
 
-while getopts p flag
+# ref: https://davetang.org/muse/2023/01/31/bash-script-that-accepts-short-long-and-positional-arguments/
+usage(){
+>&2 cat << EOF
+Usage: $0
+    [ -s | --suite Ubuntu suite for chroot environment ]
+    [ -d | --dir Mesa source directory]
+    [ -o | --options Mesa build options ]
+    [ -m | --mirror Ubuntu package mirror ]
+    [ -p | --perfetto input ]
+    [ -r | --revision Mesa revision to build ]
+    [ --spirv-tools-tag input ]
+    [ --spirv-headers-tag input ]
+EOF
+exit 1
+}
+
+args=$(getopt -a -o s:d:o:m:phr: --long suite:,dir:,options:,mirror:,perfetto,help,spirv-tools-tag:,spirv-headers-tag:,revision: -- "$@")
+
+eval set -- ${args}
+while :
 do
-    case "${flag}" in
-        p) BUILD_PERFETTO=true;;
-    ?)
-      echo "Invalid option: -${OPTARG}."
-      exit 2
-      ;;
-    esac
+  case $1 in
+    -s | --suite)      SUITE=$2    ; shift 2   ;;
+    -d | --dir)        SRC_DIR=1   ; shift 2   ;;
+    -h | --help)       usage       ; shift   ;;
+    -o | --options)    BUILD_OPTS=$2   ; shift 2 ;;
+    -m | --mirror)     PACKAGE_MIRROR=$2   ; shift 2   ;;
+    -p | --perfetto)   BUILD_PERFETTO=1   ; shift ;;
+    --spirv-tools-tag)     SPIRV_TOOLS_TAG=$2   ; shift 2   ;;
+    --spirv-headers-tag)     SPIRV_HEADERS_TAG=$2   ; shift 2   ;;
+    -r | --revision)     REV=$2   ; shift 2   ;;
+    # -- means the end of the arguments; drop this, and break out of the while loop
+    --) shift; break ;;
+    *) >&2 echo Unsupported option: $1
+       usage ;;
+  esac
 done
 
 # make sure source is available
@@ -38,13 +55,6 @@ if [ ! -d "$SRC_DIR" ]; then
     mkdir -p $SRC_DIR
 fi
 
-# Various settings
-if [ -z "$SPIRV_TOOLS_TAG" ]; then
-	SPIRV_TOOLS_TAG="v2024.4.rc2"
-fi
-if [ -z "$SPIRV_HEADERS_TAG" ]; then
-	SPIRV_HEADERS_TAG="vulkan-sdk-1.4.304.0"
-fi
 SPIRV_TOOLS_SRC_URL="https://github.com/KhronosGroup/SPIRV-Tools.git"
 SPIRV_TOOLS_SRC_DIR="$HOME/src/spirv-tools"
 SPIRV_HEADERS_SRC_URL="https://github.com/KhronosGroup/SPIRV-Headers.git"
@@ -60,6 +70,10 @@ if [ "$exit_code" -ne 0 ] ; then
     git clone https://gitlab.freedesktop.org/mesa/mesa.git $SRC_DIR
 else
     echo "Source already cloned."
+fi
+
+if [ ! "$REV" = '' ] ; then
+	git -C "$SRC_DIR" checkout "$REV"
 fi
 
 # configure execution-wide state

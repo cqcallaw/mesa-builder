@@ -4,7 +4,7 @@ set -e # terminate on errors
 set -x # echo commands
 
 if [ -z "$BUILD_OPTS" ]; then
-	BUILD_OPTS="-Dglvnd=true"
+	BUILD_OPTS="-Dglvnd=true -Dvalgrind=disabled -Dvulkan-layers=device-select,intel-nullhw,overlay,screenshot"
 fi
 
 if [ -z "$SRC_DIR" ]; then
@@ -32,7 +32,6 @@ do
       ;;
     esac
 done
-
 
 # make sure source is available
 if [ ! -d "$SRC_DIR" ]; then
@@ -152,6 +151,9 @@ EOF
 	schroot -c $2 -- sh -c "CMAKE_CXX_FLAGS=-m32 LINK_FLAGS=-m32 cmake --build $SPIRV_BUILD_DIR --parallel `nproc`"
 	# Install
 	schroot -c $2 -- sh -c "sudo cmake --build $SPIRV_BUILD_DIR --target install"
+
+	# Handle miscellaneous deps
+	schroot -c $2 -- sh -c "sudo apt -y install libpng-dev"
 
 	# do the build
 	cd $SRC_DIR

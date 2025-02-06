@@ -40,8 +40,12 @@ if [ ! -d "$SRC_DIR" ]; then
 fi
 
 # Various settings
-SPIRV_TOOLS_TAG="v2024.4.rc2"
-SPIRV_HEADERS_TAG="vulkan-sdk-1.4.304.0"
+if [ -z "$SPIRV_TOOLS_TAG" ]; then
+	SPIRV_TOOLS_TAG="v2024.4.rc2"
+fi
+if [ -z "$SPIRV_HEADERS_TAG" ]; then
+	SPIRV_HEADERS_TAG="vulkan-sdk-1.4.304.0"
+fi
 SPIRV_TOOLS_SRC_URL="https://github.com/KhronosGroup/SPIRV-Tools.git"
 SPIRV_TOOLS_SRC_DIR="$HOME/src/spirv-tools"
 SPIRV_HEADERS_SRC_URL="https://github.com/KhronosGroup/SPIRV-Headers.git"

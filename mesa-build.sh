@@ -124,10 +124,14 @@ EOF
 	schroot -c $2 -- sh -c "sudo update-alternatives --install /usr/bin/llvm-config llvm-config /usr/lib/llvm-15/bin/llvm-config 200"
 
 	# Handle Rust
-	schroot -c $2 -- sh -c "sudo apt -y install rustup"
-	# inherit environment so proxy settings pass through
-	schroot -c $2 -p -- sh -c "rustup update stable"
+	schroot -c $2 -- sh -c "sudo apt -y install curl"
+	CARGO_HOME="/usr/local"
+	RUSTUP_HOME=$CARGO_HOME
+	schroot -c $2 -- sh -c "curl https://sh.rustup.rs -sSf | sudo RUSTUP_HOME=$RUSTUP_HOME CARGO_HOME=$CARGO_HOME sh -s -- -y"
 	schroot -c $2 -- sh -c "rustup default stable"
+	schroot -c $2 -- sh -c "rustc --version"
+	schroot -c $2 -- sh -c "sudo RUSTUP_HOME=$RUSTUP_HOME CARGO_HOME=$CARGO_HOME cargo install bindgen-cli"
+	schroot -c $2 -- sh -c "sudo RUSTUP_HOME=$RUSTUP_HOME CARGO_HOME=$CARGO_HOME cargo install cbindgen"
 
 	# Handle SPIR-V tools
 	SPIRV_BUILD_DIR="$SPIRV_TOOLS_SRC_DIR/build-$SPIRV_TOOLS_TAG/$1"
@@ -152,7 +156,7 @@ EOF
 	schroot -c $2 -- sh -c "rm -rf subprojects/libdrm.wrap"
 	schroot -c $2 -- sh -c "meson wrap install libdrm"
 
-	schroot -c $2 -- sh -c "meson setup $BUILD_DIR $BUILD_OPTS --prefix=$INSTALL_DIR"
+	schroot -c $2 -- sh -c "PKG_CONFIG_PATH=$PKG_CONFIG_PATH:$INSTALL_DIR/lib/pkgconfig:$INSTALL_DIR/lib/i386-linux-gnu/pkgconfig meson setup $BUILD_DIR $BUILD_OPTS --prefix=$INSTALL_DIR"
 	schroot -c $2 -- sh -c "ninja -C $BUILD_DIR"
 	schroot -c $2 -- sh -c "sudo ninja -C $BUILD_DIR install"
 

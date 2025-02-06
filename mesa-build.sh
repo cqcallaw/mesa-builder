@@ -168,6 +168,8 @@ EOF
 	sudo cp -Tvr "${SCHROOT_PATH}${INSTALL_DIR}" "$INSTALL_DIR"
 }
 
+sudo service gdm3 stop
+
 build_mesa "amd64" "${SUITE}64" "linux"
 build_mesa "i386" "${SUITE}32" "linux32"
 

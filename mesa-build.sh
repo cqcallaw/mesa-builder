@@ -126,6 +126,8 @@ type=directory
 personality=$3
 groups=users,admin,sudo
 EOF
+	# setup passwordless sudo
+	schroot -c $2 -- sh -c "sudo sed -i 's/\%sudo\sALL=(ALL:ALL) ALL/%sudo   ALL=(ALL:ALL) NOPASSWD:ALL/' /etc/sudoers"
 
 	sudo schroot -c $2 apt update
 	# "-- sh -c" required to pass arguments to chroot correctly

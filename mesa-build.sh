@@ -22,13 +22,14 @@ Usage: $0
 	[ -m | --mirror Ubuntu package mirror ]
 	[ -p | --perfetto input ]
 	[ -r | --revision Mesa revision to build ]
+	[ -i | --install Path to local install ]
 	[ --spirv-tools-tag input ]
 	[ --spirv-headers-tag input ]
 EOF
 exit 1
 }
 
-args=$(getopt -a -o s:d:o:m:phr: --long suite:,dir:,options:,mirror:,perfetto,help,spirv-tools-tag:,spirv-headers-tag:,revision: -- "$@")
+args=$(getopt -a -o s:d:o:m:phr:i: --long suite:,dir:,options:,mirror:,perfetto,help,spirv-tools-tag:,spirv-headers-tag:,revision:,install: -- "$@")
 
 eval set -- ${args}
 while :
@@ -43,6 +44,7 @@ do
 		--spirv-tools-tag)       SPIRV_TOOLS_TAG=$2     ; shift 2   ;;
 		--spirv-headers-tag)     SPIRV_HEADERS_TAG=$2   ; shift 2   ;;
 		-r | --revision)         REV=$2                 ; shift 2   ;;
+		-i | --install)          INSTALL_DIR=$2         ; shift 2   ;;
 		# -- means the end of the arguments; drop this, and break out of the while loop
 		--) shift; break ;;
 		*) >&2 echo Unsupported option: $1

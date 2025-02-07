@@ -34,15 +34,15 @@ eval set -- ${args}
 while :
 do
   case $1 in
-    -s | --suite)      SUITE=$2    ; shift 2   ;;
-    -d | --dir)        SRC_DIR=1   ; shift 2   ;;
-    -h | --help)       usage       ; shift   ;;
-    -o | --options)    BUILD_OPTS=$2   ; shift 2 ;;
-    -m | --mirror)     PACKAGE_MIRROR=$2   ; shift 2   ;;
-    -p | --perfetto)   BUILD_PERFETTO=1   ; shift ;;
-    --spirv-tools-tag)     SPIRV_TOOLS_TAG=$2   ; shift 2   ;;
+    -s | --suite)            SUITE=$2               ; shift 2   ;;
+    -d | --dir)              SRC_DIR=$2             ; shift 2   ;;
+    -h | --help)             usage                  ; shift     ;;
+    -o | --options)          BUILD_OPTS=$2          ; shift 2   ;;
+    -m | --mirror)           PACKAGE_MIRROR=$2      ; shift 2   ;;
+    -p | --perfetto)         BUILD_PERFETTO=1       ; shift     ;;
+    --spirv-tools-tag)       SPIRV_TOOLS_TAG=$2     ; shift 2   ;;
     --spirv-headers-tag)     SPIRV_HEADERS_TAG=$2   ; shift 2   ;;
-    -r | --revision)     REV=$2   ; shift 2   ;;
+    -r | --revision)         REV=$2                 ; shift 2   ;;
     # -- means the end of the arguments; drop this, and break out of the while loop
     --) shift; break ;;
     *) >&2 echo Unsupported option: $1

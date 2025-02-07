@@ -16,14 +16,14 @@ REV=''
 usage(){
 >&2 cat << EOF
 Usage: $0
-    [ -s | --suite Ubuntu suite for chroot environment ]
-    [ -d | --dir Mesa source directory]
-    [ -o | --options Mesa build options ]
-    [ -m | --mirror Ubuntu package mirror ]
-    [ -p | --perfetto input ]
-    [ -r | --revision Mesa revision to build ]
-    [ --spirv-tools-tag input ]
-    [ --spirv-headers-tag input ]
+	[ -s | --suite Ubuntu suite for chroot environment ]
+	[ -d | --dir Mesa source directory]
+	[ -o | --options Mesa build options ]
+	[ -m | --mirror Ubuntu package mirror ]
+	[ -p | --perfetto input ]
+	[ -r | --revision Mesa revision to build ]
+	[ --spirv-tools-tag input ]
+	[ --spirv-headers-tag input ]
 EOF
 exit 1
 }
@@ -33,26 +33,26 @@ args=$(getopt -a -o s:d:o:m:phr: --long suite:,dir:,options:,mirror:,perfetto,he
 eval set -- ${args}
 while :
 do
-  case $1 in
-    -s | --suite)            SUITE=$2               ; shift 2   ;;
-    -d | --dir)              SRC_DIR=$2             ; shift 2   ;;
-    -h | --help)             usage                  ; shift     ;;
-    -o | --options)          BUILD_OPTS=$2          ; shift 2   ;;
-    -m | --mirror)           PACKAGE_MIRROR=$2      ; shift 2   ;;
-    -p | --perfetto)         BUILD_PERFETTO=1       ; shift     ;;
-    --spirv-tools-tag)       SPIRV_TOOLS_TAG=$2     ; shift 2   ;;
-    --spirv-headers-tag)     SPIRV_HEADERS_TAG=$2   ; shift 2   ;;
-    -r | --revision)         REV=$2                 ; shift 2   ;;
-    # -- means the end of the arguments; drop this, and break out of the while loop
-    --) shift; break ;;
-    *) >&2 echo Unsupported option: $1
-       usage ;;
-  esac
+	case $1 in
+		-s | --suite)            SUITE=$2               ; shift 2   ;;
+		-d | --dir)              SRC_DIR=$2             ; shift 2   ;;
+		-h | --help)             usage                  ; shift     ;;
+		-o | --options)          BUILD_OPTS=$2          ; shift 2   ;;
+		-m | --mirror)           PACKAGE_MIRROR=$2      ; shift 2   ;;
+		-p | --perfetto)         BUILD_PERFETTO=1       ; shift     ;;
+		--spirv-tools-tag)       SPIRV_TOOLS_TAG=$2     ; shift 2   ;;
+		--spirv-headers-tag)     SPIRV_HEADERS_TAG=$2   ; shift 2   ;;
+		-r | --revision)         REV=$2                 ; shift 2   ;;
+		# -- means the end of the arguments; drop this, and break out of the while loop
+		--) shift; break ;;
+		*) >&2 echo Unsupported option: $1
+		usage ;;
+	esac
 done
 
 # make sure source is available
 if [ ! -d "$SRC_DIR" ]; then
-    mkdir -p $SRC_DIR
+	mkdir -p $SRC_DIR
 fi
 
 SPIRV_TOOLS_SRC_URL="https://github.com/KhronosGroup/SPIRV-Tools.git"
@@ -65,11 +65,11 @@ git -C $SRC_DIR rev-parse 2>/dev/null
 exit_code=$(echo $?)
 set -e
 if [ "$exit_code" -ne 0 ] ; then
-    echo "Cloning source..."
-    # checkout source
-    git clone https://gitlab.freedesktop.org/mesa/mesa.git $SRC_DIR
+	echo "Cloning source..."
+	# checkout source
+	git clone https://gitlab.freedesktop.org/mesa/mesa.git $SRC_DIR
 else
-    echo "Source already cloned."
+	echo "Source already cloned."
 fi
 
 if [ ! "$REV" = '' ] ; then

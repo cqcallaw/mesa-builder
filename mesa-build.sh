@@ -200,3 +200,4 @@ if $BUILD_PERFETTO; then
 	./tools/ninja -C out/linux
 fi
 
+sudo ln -sfn $INSTALL_DIR /usr/local

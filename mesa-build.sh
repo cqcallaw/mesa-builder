@@ -73,6 +73,7 @@ else
 fi
 
 if [ ! "$REV" = '' ] ; then
+	git -C "$SRC_DIR" fetch --tags
 	git -C "$SRC_DIR" checkout "$REV"
 fi
 

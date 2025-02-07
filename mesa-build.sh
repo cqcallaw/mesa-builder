@@ -5,7 +5,7 @@ set -x # echo commands
 
 SUITE=$(lsb_release --codename --short)
 SRC_DIR="$HOME/src/mesa"
-BUILD_OPTS="-Dglvnd=true -Dvalgrind=disabled -Dvulkan-layers=device-select,intel-nullhw,overlay,screenshot"
+BUILD_OPTS="-Dglvnd=true -Dvalgrind=disabled -Dvulkan-layers=device-select,intel-nullhw,overlay,screenshot -Dintel-clc=enabled -Dintel-rt=enabled"
 PACKAGE_MIRROR="http://archive.ubuntu.com/ubuntu"
 BUILD_PERFETTO=false
 SPIRV_TOOLS_TAG="v2024.4.rc2"

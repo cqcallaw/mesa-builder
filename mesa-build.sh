@@ -40,7 +40,7 @@ do
 		-h | --help)             usage                  ; shift     ;;
 		-o | --options)          BUILD_OPTS=$2          ; shift 2   ;;
 		-m | --mirror)           PACKAGE_MIRROR=$2      ; shift 2   ;;
-		-p | --perfetto)         BUILD_PERFETTO=1       ; shift     ;;
+		-p | --perfetto)         BUILD_PERFETTO=y       ; shift     ;;
 		--spirv-tools-tag)       SPIRV_TOOLS_TAG=$2     ; shift 2   ;;
 		--spirv-headers-tag)     SPIRV_HEADERS_TAG=$2   ; shift 2   ;;
 		-r | --revision)         REV=$2                 ; shift 2   ;;
@@ -82,7 +82,7 @@ fi
 # configure execution-wide state
 BUILD_ID=`git -C $SRC_DIR describe --always --tags`
 
-if $BUILD_PERFETTO; then
+if [ "$BUILD_PERFETTO" = "y" ]; then
 	BUILD_OPTS="$BUILD_OPTS -Dperfetto=true"
 	BUILD_ID="$BUILD_ID+perfetto"
 fi
@@ -196,7 +196,7 @@ sudo rm -f /usr/local
 build_mesa "amd64" "${SUITE}64" "linux"
 build_mesa "i386" "${SUITE}32" "linux32"
 
-if $BUILD_PERFETTO; then
+if [ "$BUILD_PERFETTO" = "y" ]; then
 	# ref: https://docs.mesa3d.org/perfetto.html
 	cd $SRC_DIR/subprojects/perfetto
 	./tools/install-build-deps

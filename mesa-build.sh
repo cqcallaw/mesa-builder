@@ -149,9 +149,11 @@ EOF
 	schroot -c $2 -- sh -c "sudo apt -y install curl"
 	CARGO_HOME="/usr/local"
 	RUSTUP_HOME=$CARGO_HOME
-	schroot -c $2 -- sh -c "curl https://sh.rustup.rs -sSf | sudo RUSTUP_HOME=$RUSTUP_HOME CARGO_HOME=$CARGO_HOME sh -s -- -y"
+	schroot -c $2 -- sh -c "curl https://sh.rustup.rs -sSf | sudo RUSTUP_INIT_SKIP_PATH_CHECK='yes' RUSTUP_HOME=$RUSTUP_HOME CARGO_HOME=$CARGO_HOME sh -s -- -y"
 	schroot -c $2 -- sh -c "rustup default stable"
-	schroot -c $2 -- sh -c "rustc --version"
+	schroot -c $2 -- sh -c "which rustc" # for diagnostics
+	schroot -c $2 -- sh -c "rustc --version" # for diagnostics
+	schroot -c $2 -- sh -c "rustfmt --version" # for diagnostics
 	schroot -c $2 -- sh -c "sudo RUSTUP_HOME=$RUSTUP_HOME CARGO_HOME=$CARGO_HOME cargo install bindgen-cli"
 	schroot -c $2 -- sh -c "sudo RUSTUP_HOME=$RUSTUP_HOME CARGO_HOME=$CARGO_HOME cargo install cbindgen"
 

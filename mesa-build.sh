@@ -140,6 +140,11 @@ EOF
 	schroot -c $2 -- sh -c "sudo apt -y build-dep mesa"
 	schroot -c $2 -- sh -c "sudo apt -y install git"
 
+	# handle meson
+	schroot -c $2 -- sh -c "sudo apt -y install python3-pip"
+	schroot -c $2 -- sh -c "sudo pip3 install --upgrade pip"
+	schroot -c $2 -- sh -c "sudo pip3 install --break-system-packages --upgrade meson"
+
 	# Handle LLVM
 	schroot -c $2 -- sh -c "sudo apt -y install llvm llvm-15"
 	# Contemporary Mesa requires LLVM 15. Make sure it's available

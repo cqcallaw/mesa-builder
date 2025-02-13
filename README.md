@@ -1,5 +1,5 @@
 # Mesa Builder
-A script to build a Mesa from a given source revision on Ubuntu using chroot.
+A script to build Mesa on Ubuntu using chroot.
 
 # Configuration
 

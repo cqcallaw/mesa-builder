@@ -28,7 +28,7 @@ A script to build Mesa on Ubuntu using chroot.
 # Build the Intel driver only (N.B. this overrides the default options)
 ~/src/mesa-builder/mesa-build.sh --options "-Dvulkan-drivers=intel"
 
-# Build the Perfetto
+# Build with Perfetto support
 ~/src/mesa-builder/mesa-build.sh --perfetto
 
 # Purge everything and start over

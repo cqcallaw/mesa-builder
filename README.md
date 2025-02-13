@@ -7,13 +7,14 @@ A script to build a Mesa from a given source revision on Ubuntu using chroot.
     - `http_proxy`
     - `https_proxy`
     - `no_proxy`
-2. Setup [additional mount points](https://superuser.com/a/676004) in `/etc/schroot/default/fstab`
-3. Configure environment to use the local Mesa build exclusively:
+2. Configure environment to use the local Mesa build exclusively:
     ```
     LD_LIBRARY_PATH=/usr/local/lib/x86_64-linux-gnu:/usr/local/lib/i386-linux-gnu
     LIBGL_DRIVERS_PATH=/usr/local/lib/x86_64-linux-gnu/dri:/usr/local/lib/i386-linux-gnu/dri
+    # For Intel; update as needed for other platforms
     VK_ICD_FILENAMES=/usr/local/share/vulkan/icd.d/intel_icd.x86_64.json:/usr/local/share/vulkan/icd.d/intel_icd.i686.json
     ```
+3. Setup [additional mount points](https://superuser.com/a/676004) in `/etc/schroot/default/fstab` if needed
 
 # Examples
 
@@ -29,6 +30,10 @@ A script to build a Mesa from a given source revision on Ubuntu using chroot.
 
 # Build the Perfetto
 ~/src/mesa-builder/mesa-build.sh --perfetto
+
+# Purge everything and start over
+git -C ~/src/mesa clean -fxd && sudo rm -rf /build && rm -rf ~/src/spirv-tools && ~/src/mesa-builder/mesa-build.sh
+
 ```
 
 # Verify

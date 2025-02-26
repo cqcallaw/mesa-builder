@@ -93,6 +93,8 @@ fi
 if [ "$BUILD_DEBUG" = "y" ]; then
         BUILD_OPTS="$BUILD_OPTS --buildtype=debug"
         BUILD_ID="$BUILD_ID+debug"
+else
+	BUILD_OPTS="$BUILD_OPTS --buildtype=release"
 fi
 
 if [ -z "$INSTALL_DIR" ]; then

@@ -12,6 +12,7 @@ SPIRV_TOOLS_TAG="v2024.4.rc2"
 SPIRV_HEADERS_TAG="vulkan-sdk-1.4.304.0"
 REV=''
 BUILD_DEBUG='n'
+BUILD_DEBUG_OPTIM='n'
 
 # ref: https://davetang.org/muse/2023/01/31/bash-script-that-accepts-short-long-and-positional-arguments/
 usage(){
@@ -25,13 +26,14 @@ Usage: $0
 	[ -r | --revision Mesa revision to build ]
 	[ -i | --install Path to local install ]
 	[ --debug Debug build ]
+	[ --dbgoptim Debug optimized build ]
 	[ --spirv-tools-tag input ]
 	[ --spirv-headers-tag input ]
 EOF
 exit 1
 }
 
-args=$(getopt -a -o s:d:o:m:phr:i: --long suite:,dir:,options:,mirror:,perfetto,help,spirv-tools-tag:,spirv-headers-tag:,revision:,install:,debug -- "$@")
+args=$(getopt -a -o s:d:o:m:phr:i: --long suite:,dir:,options:,mirror:,perfetto,help,spirv-tools-tag:,spirv-headers-tag:,revision:,install:,debug,dbgoptim -- "$@")
 
 eval set -- ${args}
 while :
@@ -44,6 +46,7 @@ do
 		-m | --mirror)           PACKAGE_MIRROR=$2      ; shift 2   ;;
 		-p | --perfetto)         BUILD_PERFETTO=y       ; shift     ;;
 		--debug)                 BUILD_DEBUG=y          ; shift     ;;
+		--dbgoptim)              BUILD_DEBUG_OPTIM=y    ; shift     ;;
 		--spirv-tools-tag)       SPIRV_TOOLS_TAG=$2     ; shift 2   ;;
 		--spirv-headers-tag)     SPIRV_HEADERS_TAG=$2   ; shift 2   ;;
 		-r | --revision)         REV=$2                 ; shift 2   ;;
@@ -93,6 +96,9 @@ fi
 if [ "$BUILD_DEBUG" = "y" ]; then
         BUILD_OPTS="$BUILD_OPTS --buildtype=debug"
         BUILD_ID="$BUILD_ID+debug"
+elif [ "$BUILD_DEBUG_OPTIM" = "y" ]; then
+        BUILD_OPTS="$BUILD_OPTS --buildtype=debugoptimized"
+        BUILD_ID="$BUILD_ID+dbg-optim"
 else
 	BUILD_OPTS="$BUILD_OPTS --buildtype=release"
 fi

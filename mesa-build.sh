@@ -5,7 +5,7 @@ set -x # echo commands
 
 SUITE=$(lsb_release --codename --short)
 SRC_DIR="$HOME/src/mesa"
-BUILD_OPTS="-Dglvnd=true -Dvalgrind=disabled -Dvulkan-layers=device-select,intel-nullhw,overlay,screenshot -Dintel-clc=enabled -Dintel-rt=enabled"
+BUILD_OPTS="-Dglvnd=true -Dvalgrind=disabled -Dvulkan-layers=device-select,intel-nullhw,overlay,screenshot -Dintel-clc=enabled -Dintel-rt=enabled -Dtools=intel"
 VULKAN_DRIVERS="intel"
 GALLIUM_DRIVERS="iris"
 PACKAGE_MIRROR="http://archive.ubuntu.com/ubuntu"

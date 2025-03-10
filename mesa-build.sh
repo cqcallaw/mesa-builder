@@ -5,7 +5,9 @@ set -x # echo commands
 
 SUITE=$(lsb_release --codename --short)
 SRC_DIR="$HOME/src/mesa"
-BUILD_OPTS="-Dglvnd=true -Dvalgrind=disabled -Dvulkan-layers=device-select,intel-nullhw,overlay,screenshot -Dintel-clc=enabled -Dintel-rt=enabled -Dvulkan-drivers=intel,amd -Dgallium-drivers=iris,radeonsi"
+BUILD_OPTS="-Dglvnd=true -Dvalgrind=disabled -Dvulkan-layers=device-select,intel-nullhw,overlay,screenshot -Dintel-clc=enabled -Dintel-rt=enabled"
+VULKAN_DRIVERS="intel"
+GALLIUM_DRIVERS="iris"
 PACKAGE_MIRROR="http://archive.ubuntu.com/ubuntu"
 BUILD_PERFETTO=false
 SPIRV_TOOLS_TAG="v2024.4.rc2"
@@ -13,6 +15,7 @@ SPIRV_HEADERS_TAG="vulkan-sdk-1.4.304.0"
 REV=''
 BUILD_DEBUG='n'
 BUILD_DEBUG_OPTIM='n'
+BUILD_AMD='n'
 
 # ref: https://davetang.org/muse/2023/01/31/bash-script-that-accepts-short-long-and-positional-arguments/
 usage(){
@@ -25,6 +28,7 @@ Usage: $0
 	[ -p | --perfetto input ]
 	[ -r | --revision Mesa revision to build ]
 	[ -i | --install Path to local install ]
+	[ --amd Debug AMD drivers ]
 	[ --debug Debug build ]
 	[ --dbgoptim Debug optimized build ]
 	[ --spirv-tools-tag input ]
@@ -33,7 +37,7 @@ EOF
 exit 1
 }
 
-args=$(getopt -a -o s:d:o:m:phr:i: --long suite:,dir:,options:,mirror:,perfetto,help,spirv-tools-tag:,spirv-headers-tag:,revision:,install:,debug,dbgoptim -- "$@")
+args=$(getopt -a -o s:d:o:m:phr:i: --long suite:,dir:,options:,mirror:,perfetto,help,spirv-tools-tag:,spirv-headers-tag:,revision:,install:,debug,dbgoptim,amd -- "$@")
 
 eval set -- ${args}
 while :
@@ -45,6 +49,7 @@ do
 		-o | --options)          BUILD_OPTS=$2          ; shift 2   ;;
 		-m | --mirror)           PACKAGE_MIRROR=$2      ; shift 2   ;;
 		-p | --perfetto)         BUILD_PERFETTO=y       ; shift     ;;
+		--amd)                   BUILD_AMD=y            ; shift     ;;
 		--debug)                 BUILD_DEBUG=y          ; shift     ;;
 		--dbgoptim)              BUILD_DEBUG_OPTIM=y    ; shift     ;;
 		--spirv-tools-tag)       SPIRV_TOOLS_TAG=$2     ; shift 2   ;;
@@ -106,6 +111,16 @@ fi
 if [ -z "$INSTALL_DIR" ]; then
 	INSTALL_DIR=/usr/local-$BUILD_ID
 fi
+
+# handle AMD driver build
+if [ "$BUILD_AMD" = "y" ]; then
+	VULKAN_DRIVERS="$VULKAN_DRIVERS,amd"
+	GALLIUM_DRIVERS="$GALLIUM_DRIVERS,radeonsi"
+fi
+
+DRIVER_OPTS="-Dvulkan-drivers=$VULKAN_DRIVERS -Dgallium-drivers=$GALLIUM_DRIVERS"
+
+BUILD_OPTS="$BUILD_OPTS $DRIVER_OPTS"
 
 build_mesa() {
 	# $1: The schroot architecure

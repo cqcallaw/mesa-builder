@@ -226,8 +226,9 @@ sudo service gdm3 stop
 
 sudo rm -f /usr/local
 
-build_mesa "amd64" "${SUITE}64" "linux"
 build_mesa "i386" "${SUITE}32" "linux32"
+# build 64 bit last so 64b tools are installed
+build_mesa "amd64" "${SUITE}64" "linux"
 
 if [ "$BUILD_PERFETTO" = "y" ]; then
 	# ref: https://docs.mesa3d.org/perfetto.html

@@ -212,7 +212,7 @@ EOF
 	schroot -c $2 -- sh -c "sudo cmake --build $SPIRV_BUILD_DIR --target install"
 
 	# Handle miscellaneous deps
-	schroot -c $2 -- sh -c "sudo apt -y install libpng-dev"
+	schroot -c $2 -- sh -c "sudo apt -y install libpng-dev liblua5.3-dev"
 
 	# do the build
 	cd $SRC_DIR

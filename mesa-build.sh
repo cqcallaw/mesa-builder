@@ -17,6 +17,7 @@ BUILD_DEBUG='n'
 BUILD_DEBUG_OPTIM='n'
 BUILD_AMD='n'
 BUILD_32='y'
+DEPLOY='y'
 
 # ref: https://davetang.org/muse/2023/01/31/bash-script-that-accepts-short-long-and-positional-arguments/
 usage(){
@@ -33,13 +34,14 @@ Usage: $0
 	[ --debug Debug build ]
 	[ --dbgoptim Debug optimized build ]
 	[ --no32 ]
+	[ --nodeploy ]
 	[ --spirv-tools-tag input ]
 	[ --spirv-headers-tag input ]
 EOF
 exit 1
 }
 
-args=$(getopt -a -o s:d:o:m:phr:i: --long suite:,dir:,options:,mirror:,perfetto,help,spirv-tools-tag:,spirv-headers-tag:,revision:,install:,debug,dbgoptim,amd,no32 -- "$@")
+args=$(getopt -a -o s:d:o:m:phr:i: --long suite:,dir:,options:,mirror:,perfetto,help,spirv-tools-tag:,spirv-headers-tag:,revision:,install:,debug,dbgoptim,amd,no32,nodeploy -- "$@")
 
 eval set -- ${args}
 while :
@@ -55,6 +57,7 @@ do
 		--debug)                 BUILD_DEBUG=y          ; shift     ;;
 		--dbgoptim)              BUILD_DEBUG_OPTIM=y    ; shift     ;;
 		--no32)                  BUILD_32=n             ; shift     ;;
+		--nodeploy)              DEPLOY=n               ; shift     ;;
 		--spirv-tools-tag)       SPIRV_TOOLS_TAG=$2     ; shift 2   ;;
 		--spirv-headers-tag)     SPIRV_HEADERS_TAG=$2   ; shift 2   ;;
 		-r | --revision)         REV=$2                 ; shift 2   ;;
@@ -225,13 +228,15 @@ EOF
 	schroot -c $2 -- sh -c "ninja -C $BUILD_DIR"
 	schroot -c $2 -- sh -c "sudo ninja -C $BUILD_DIR install"
 
-	# deploy
+	# copy to local install directory
 	sudo cp -Tvr "${SCHROOT_PATH}${INSTALL_DIR}" "$INSTALL_DIR"
 }
 
-sudo service gdm3 stop
+if [ "$DEPLOY" = "y" ]; then
+	sudo service gdm3 stop
 
-sudo rm -f /usr/local
+	sudo rm -f /usr/local
+fi
 
 if [ "$BUILD_32" = "y" ]; then
 	build_mesa "i386" "${SUITE}32" "linux32"
@@ -247,4 +252,6 @@ if [ "$BUILD_PERFETTO" = "y" ]; then
 	./tools/ninja -C out/linux
 fi
 
-sudo ln -sfn $INSTALL_DIR /usr/local
+if [ "$DEPLOY" = "y" ]; then
+	sudo ln -sfn $INSTALL_DIR /usr/local
+fi

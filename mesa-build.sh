@@ -235,7 +235,19 @@ EOF
 if [ "$DEPLOY" = "y" ]; then
 	sudo service gdm3 stop
 
-	sudo rm -f /usr/local
+	if [ -d "/usr/local" ]; then
+		# mesa-builder deploys Mesa by symlinking /usr/local to the install directory
+		# if /usr/local is not a symlink, the user must handle the situation manually
+		if [ -L "/usr/local" ]; then
+			# we have a symlink; okay to proceed
+			sudo rm -f /usr/local
+		else
+			set +x
+			echo "Warning: /usr/local is not a symlink. Deploy cannot continue."
+			echo "Please remove /usr/local and re-run the script."
+			exit 1
+		fi
+	fi
 fi
 
 if [ "$BUILD_32" = "y" ]; then

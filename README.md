@@ -1,6 +1,8 @@
 # Mesa Builder
 A script to build and deploy Mesa on Ubuntu using chroot.
 
+Builds are deployed to `/usr/local-$(git describe --always --tags)` by default. `/usr/local` is converted to a symlink that points to the most recent build.
+
 # Configuration
 
 1. Setup proxy environment if needed:
@@ -30,6 +32,12 @@ A script to build and deploy Mesa on Ubuntu using chroot.
 
 # Build with Perfetto support
 ~/src/mesa-builder/mesa-build.sh --perfetto
+
+# Build without deploying
+~/src/mesa-builder/mesa-build.sh --nodeploy
+
+# Build without building deps (fast, but may fail)
+~/src/mesa-builder/mesa-build.sh --nodeps
 
 # Purge everything and start over
 git -C ~/src/mesa clean -fxd && sudo rm -rf /build && rm -rf ~/src/spirv-tools && ~/src/mesa-builder/mesa-build.sh

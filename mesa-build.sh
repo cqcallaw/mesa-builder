@@ -18,6 +18,7 @@ BUILD_DEBUG_OPTIM='n'
 BUILD_AMD='n'
 BUILD_32='y'
 DEPLOY='y'
+DEPS='y'
 
 # ref: https://davetang.org/muse/2023/01/31/bash-script-that-accepts-short-long-and-positional-arguments/
 usage(){
@@ -35,13 +36,14 @@ Usage: $0
 	[ --dbgoptim Debug optimized build ]
 	[ --no32 ]
 	[ --nodeploy ]
+	[ --nodeps ]
 	[ --spirv-tools-tag input ]
 	[ --spirv-headers-tag input ]
 EOF
 exit 1
 }
 
-args=$(getopt -a -o s:d:o:m:phr:i: --long suite:,dir:,options:,mirror:,perfetto,help,spirv-tools-tag:,spirv-headers-tag:,revision:,install:,debug,dbgoptim,amd,no32,nodeploy -- "$@")
+args=$(getopt -a -o s:d:o:m:phr:i: --long suite:,dir:,options:,mirror:,perfetto,help,spirv-tools-tag:,spirv-headers-tag:,revision:,install:,debug,dbgoptim,amd,no32,nodeploy,nodeps -- "$@")
 
 eval set -- ${args}
 while :
@@ -58,6 +60,7 @@ do
 		--dbgoptim)              BUILD_DEBUG_OPTIM=y    ; shift     ;;
 		--no32)                  BUILD_32=n             ; shift     ;;
 		--nodeploy)              DEPLOY=n               ; shift     ;;
+		--nodeps)                DEPS=n                 ; shift     ;;
 		--spirv-tools-tag)       SPIRV_TOOLS_TAG=$2     ; shift 2   ;;
 		--spirv-headers-tag)     SPIRV_HEADERS_TAG=$2   ; shift 2   ;;
 		-r | --revision)         REV=$2                 ; shift 2   ;;
@@ -134,19 +137,22 @@ build_mesa() {
 	# $3: The schroot personality
 	# ref: https://unix.stackexchange.com/questions/12956/how-do-i-run-32-bit-programs-on-a-64-bit-debian-ubuntu
 	SCHROOT_PATH="/build/$SUITE/$1"
-	
-	sudo apt -y install schroot debootstrap
-	sudo mkdir -p $SCHROOT_PATH
 
-	echo "Bootstrapping environment..."
-	set +e # debootstrap will return non-zero if the environment has been previously provisioned
-	sudo debootstrap --arch $1 $SUITE $SCHROOT_PATH $PACKAGE_MIRROR
-	set -e
+	if [ "$DEPS" = "n" ]; then
+		echo "Skipping dependency installation."
+	else
+		sudo apt -y install schroot debootstrap
+		sudo mkdir -p $SCHROOT_PATH
 
-	echo "Configuring apt..."
-	# create minimum viable apt sources
-	# ref: https://stackoverflow.com/questions/17487872/shell-writing-many-lines-in-a-file-as-sudo
-	sudo sh -c "cat > $SCHROOT_PATH/etc/apt/sources.list" << EOF
+		echo "Bootstrapping environment..."
+		set +e # debootstrap will return non-zero if the environment has been previously provisioned
+		sudo debootstrap --arch $1 $SUITE $SCHROOT_PATH $PACKAGE_MIRROR
+		set -e
+
+		echo "Configuring apt..."
+		# create minimum viable apt sources
+		# ref: https://stackoverflow.com/questions/17487872/shell-writing-many-lines-in-a-file-as-sudo
+		sudo sh -c "cat > $SCHROOT_PATH/etc/apt/sources.list" << EOF
 deb ${PACKAGE_MIRROR} ${SUITE} universe restricted main multiverse
 deb ${PACKAGE_MIRROR} ${SUITE}-updates universe restricted main multiverse
 deb ${PACKAGE_MIRROR} ${SUITE}-backports universe restricted main multiverse
@@ -157,8 +163,8 @@ deb-src ${PACKAGE_MIRROR} ${SUITE}-backports universe restricted main multiverse
 deb-src ${PACKAGE_MIRROR} ${SUITE}-security universe restricted main multiverse
 EOF
 
-	echo "Configuring chroot..."
-	sudo sh -c "cat > /etc/schroot/chroot.d/$2" << EOF
+		echo "Configuring chroot..."
+		sudo sh -c "cat > /etc/schroot/chroot.d/$2" << EOF
 [$2]
 description=Mesa Build Env
 directory=$SCHROOT_PATH
@@ -166,56 +172,57 @@ type=directory
 personality=$3
 groups=users,admin,sudo
 EOF
-	# setup passwordless sudo
-	schroot -c $2 -- sh -c "sudo sed -i 's/\%sudo\sALL=(ALL:ALL) ALL/%sudo   ALL=(ALL:ALL) NOPASSWD:ALL/' /etc/sudoers"
+		# setup passwordless sudo
+		schroot -c $2 -- sh -c "sudo sed -i 's/\%sudo\sALL=(ALL:ALL) ALL/%sudo   ALL=(ALL:ALL) NOPASSWD:ALL/' /etc/sudoers"
 
-	sudo schroot -c $2 apt update
-	# "-- sh -c" required to pass arguments to chroot correctly
-	# ref: https://stackoverflow.com/a/3074544
-	schroot -c $2 -- sh -c "sudo apt -y --fix-broken install" # sometimes required for initial setup
-	schroot -c $2 -- sh -c "sudo apt -y upgrade"
-	schroot -c $2 -- sh -c "sudo apt -y build-dep mesa"
-	schroot -c $2 -- sh -c "sudo apt -y install git"
+		sudo schroot -c $2 apt update
+		# "-- sh -c" required to pass arguments to chroot correctly
+		# ref: https://stackoverflow.com/a/3074544
+		schroot -c $2 -- sh -c "sudo apt -y --fix-broken install" # sometimes required for initial setup
+		schroot -c $2 -- sh -c "sudo apt -y upgrade"
+		schroot -c $2 -- sh -c "sudo apt -y build-dep mesa"
+		schroot -c $2 -- sh -c "sudo apt -y install git"
 
-	# setup git proxy
-	schroot -c $2 -- sh -c "git config --global http.proxy $http_proxy"
-	schroot -c $2 -- sh -c "git config --global https.proxy $https_proxy"
+		# setup git proxy
+		schroot -c $2 -- sh -c "git config --global http.proxy $http_proxy"
+		schroot -c $2 -- sh -c "git config --global https.proxy $https_proxy"
 
-	# Handle LLVM
-	schroot -c $2 -- sh -c "sudo apt -y install llvm llvm-15"
-	# Contemporary Mesa requires LLVM 15. Make sure it's available
-	schroot -c $2 -- sh -c "sudo update-alternatives --install /usr/bin/llvm-config llvm-config /usr/lib/llvm-15/bin/llvm-config 200"
+		# Handle LLVM
+		schroot -c $2 -- sh -c "sudo apt -y install llvm llvm-15"
+		# Contemporary Mesa requires LLVM 15. Make sure it's available
+		schroot -c $2 -- sh -c "sudo update-alternatives --install /usr/bin/llvm-config llvm-config /usr/lib/llvm-15/bin/llvm-config 200"
 
-	# Handle Rust
-	schroot -c $2 -- sh -c "sudo apt -y install curl"
-	CARGO_HOME="/usr/local"
-	RUSTUP_HOME=$CARGO_HOME
-	schroot -c $2 -- sh -c "http_proxy=$http_proxy https_proxy=$https_proxy curl https://sh.rustup.rs -sSf | sudo http_proxy=$http_proxy https_proxy=$https_proxy RUSTUP_INIT_SKIP_PATH_CHECK='yes' RUSTUP_HOME=$RUSTUP_HOME CARGO_HOME=$CARGO_HOME sh -s -- -y"
-	schroot -c $2 -- sh -c "http_proxy=$http_proxy https_proxy=$https_proxy rustup default stable"
-	schroot -c $2 -- sh -c "which rustc" # for diagnostics
-	schroot -c $2 -- sh -c "rustc --version" # for diagnostics
-	schroot -c $2 -- sh -c "rustfmt --version" # for diagnostics
-	schroot -c $2 -- sh -c "sudo http_proxy=$http_proxy https_proxy=$https_proxy RUSTUP_HOME=$RUSTUP_HOME CARGO_HOME=$CARGO_HOME cargo install bindgen-cli"
-	schroot -c $2 -- sh -c "sudo http_proxy=$http_proxy https_proxy=$https_proxy RUSTUP_HOME=$RUSTUP_HOME CARGO_HOME=$CARGO_HOME cargo install cbindgen"
+		# Handle Rust
+		schroot -c $2 -- sh -c "sudo apt -y install curl"
+		CARGO_HOME="/usr/local"
+		RUSTUP_HOME=$CARGO_HOME
+		schroot -c $2 -- sh -c "http_proxy=$http_proxy https_proxy=$https_proxy curl https://sh.rustup.rs -sSf | sudo http_proxy=$http_proxy https_proxy=$https_proxy RUSTUP_INIT_SKIP_PATH_CHECK='yes' RUSTUP_HOME=$RUSTUP_HOME CARGO_HOME=$CARGO_HOME sh -s -- -y"
+		schroot -c $2 -- sh -c "http_proxy=$http_proxy https_proxy=$https_proxy rustup default stable"
+		schroot -c $2 -- sh -c "which rustc" # for diagnostics
+		schroot -c $2 -- sh -c "rustc --version" # for diagnostics
+		schroot -c $2 -- sh -c "rustfmt --version" # for diagnostics
+		schroot -c $2 -- sh -c "sudo http_proxy=$http_proxy https_proxy=$https_proxy RUSTUP_HOME=$RUSTUP_HOME CARGO_HOME=$CARGO_HOME cargo install bindgen-cli"
+		schroot -c $2 -- sh -c "sudo http_proxy=$http_proxy https_proxy=$https_proxy RUSTUP_HOME=$RUSTUP_HOME CARGO_HOME=$CARGO_HOME cargo install cbindgen"
 
-	# Handle SPIR-V tools
-	SPIRV_BUILD_DIR="$SPIRV_TOOLS_SRC_DIR/build-$SPIRV_TOOLS_TAG/$1"
-	schroot -c $2 -- sh -c "sudo apt -y install cmake"
-	schroot -c $2 -- sh -c "git -C $SPIRV_TOOLS_SRC_DIR pull origin main || git clone $SPIRV_TOOLS_SRC_URL $SPIRV_TOOLS_SRC_DIR"
-	schroot -c $2 -- sh -c "git -C $SPIRV_TOOLS_SRC_DIR fetch --tags"
-	schroot -c $2 -- sh -c "git -C $SPIRV_TOOLS_SRC_DIR checkout $SPIRV_TOOLS_TAG"
-	schroot -c $2 -- sh -c "git -C $SPIRV_HEADERS_SRC_DIR pull origin main || git clone $SPIRV_HEADERS_SRC_URL $SPIRV_HEADERS_SRC_DIR"
-	schroot -c $2 -- sh -c "git -C $SPIRV_HEADERS_SRC_DIR fetch --tags"
-	schroot -c $2 -- sh -c "git -C $SPIRV_HEADERS_SRC_DIR checkout $SPIRV_HEADERS_TAG"
-	# Configure
-	schroot -c $2 -- sh -c "cmake -B$SPIRV_BUILD_DIR -H$SPIRV_TOOLS_SRC_DIR -DCMAKE_INSTALL_PREFIX=$INSTALL_DIR"
-	# Build
-	schroot -c $2 -- sh -c "CMAKE_CXX_FLAGS=-m32 LINK_FLAGS=-m32 cmake --build $SPIRV_BUILD_DIR --parallel `nproc`"
-	# Install
-	schroot -c $2 -- sh -c "sudo cmake --build $SPIRV_BUILD_DIR --target install"
+		# Handle SPIR-V tools
+		SPIRV_BUILD_DIR="$SPIRV_TOOLS_SRC_DIR/build-$SPIRV_TOOLS_TAG/$1"
+		schroot -c $2 -- sh -c "sudo apt -y install cmake"
+		schroot -c $2 -- sh -c "git -C $SPIRV_TOOLS_SRC_DIR pull origin main || git clone $SPIRV_TOOLS_SRC_URL $SPIRV_TOOLS_SRC_DIR"
+		schroot -c $2 -- sh -c "git -C $SPIRV_TOOLS_SRC_DIR fetch --tags"
+		schroot -c $2 -- sh -c "git -C $SPIRV_TOOLS_SRC_DIR checkout $SPIRV_TOOLS_TAG"
+		schroot -c $2 -- sh -c "git -C $SPIRV_HEADERS_SRC_DIR pull origin main || git clone $SPIRV_HEADERS_SRC_URL $SPIRV_HEADERS_SRC_DIR"
+		schroot -c $2 -- sh -c "git -C $SPIRV_HEADERS_SRC_DIR fetch --tags"
+		schroot -c $2 -- sh -c "git -C $SPIRV_HEADERS_SRC_DIR checkout $SPIRV_HEADERS_TAG"
+		# Configure
+		schroot -c $2 -- sh -c "cmake -B$SPIRV_BUILD_DIR -H$SPIRV_TOOLS_SRC_DIR -DCMAKE_INSTALL_PREFIX=$INSTALL_DIR"
+		# Build
+		schroot -c $2 -- sh -c "CMAKE_CXX_FLAGS=-m32 LINK_FLAGS=-m32 cmake --build $SPIRV_BUILD_DIR --parallel `nproc`"
+		# Install
+		schroot -c $2 -- sh -c "sudo cmake --build $SPIRV_BUILD_DIR --target install"
 
-	# Handle miscellaneous deps
-	schroot -c $2 -- sh -c "sudo apt -y install libpng-dev liblua5.3-dev"
+		# Handle miscellaneous deps
+		schroot -c $2 -- sh -c "sudo apt -y install libpng-dev liblua5.3-dev"
+	fi
 
 	# do the build
 	cd $SRC_DIR

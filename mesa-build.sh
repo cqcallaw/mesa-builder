@@ -238,6 +238,8 @@ EOF
 	mkdir -p $BUILD_DIR
 	schroot -c $2 -- sh -c "rm -rf subprojects/libdrm.wrap"
 	schroot -c $2 -- sh -c "http_proxy=$http_proxy https_proxy=$https_proxy meson wrap install libdrm"
+	schroot -c $2 -- sh -c "rm -rf subprojects/wayland-protocols.wrap"
+	schroot -c $2 -- sh -c "http_proxy=$http_proxy https_proxy=$https_proxy meson wrap install wayland-protocols"
 
 	schroot -c $2 -- sh -c "http_proxy=$http_proxy https_proxy=$https_proxy PKG_CONFIG_PATH=$PKG_CONFIG_PATH:$INSTALL_DIR/lib/pkgconfig:$INSTALL_DIR/lib/i386-linux-gnu/pkgconfig meson setup $BUILD_DIR $BUILD_OPTS --prefix=$INSTALL_DIR"
 	schroot -c $2 -- sh -c "ninja -C $BUILD_DIR"

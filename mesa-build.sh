@@ -184,8 +184,16 @@ EOF
 		schroot -c $2 -- sh -c "sudo apt -y install git"
 
 		# setup git proxy
-		schroot -c $2 -- sh -c "git config --global http.proxy $http_proxy"
-		schroot -c $2 -- sh -c "git config --global https.proxy $https_proxy"
+		if [ -n "$http_proxy" ]; then
+			schroot -c $2 -- sh -c "git config --global http.proxy $http_proxy"
+		else
+			schroot -c $2 -- sh -c "git config --global --unset http.proxy || true"
+		fi
+		if [ -n "$https_proxy" ]; then
+			schroot -c $2 -- sh -c "git config --global https.proxy $https_proxy"
+		else
+			schroot -c $2 -- sh -c "git config --global --unset https.proxy || true"
+		fi
 
 		# Handle LLVM
 		schroot -c $2 -- sh -c "sudo apt -y install llvm llvm-15"

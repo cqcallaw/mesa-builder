@@ -16,6 +16,8 @@ Builds are deployed to `/usr/local-$(git describe --always --tags)` by default. 
     # For Intel; update as needed for other platforms
     VK_ICD_FILENAMES=/usr/local/share/vulkan/icd.d/intel_icd.x86_64.json:/usr/local/share/vulkan/icd.d/intel_icd.i686.json
     ```
+
+    For most deployments, these environment variables should be set in `/etc/environment`. Restart the user session (or reboot) to apply the changes.
 3. Setup [additional mount points](https://superuser.com/a/676004) in `/etc/schroot/default/fstab` if needed
 
 # Examples

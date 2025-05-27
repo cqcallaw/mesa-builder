@@ -243,10 +243,13 @@ EOF
 
 	schroot -c $2 -- sh -c "http_proxy=$http_proxy https_proxy=$https_proxy PKG_CONFIG_PATH=$PKG_CONFIG_PATH:$INSTALL_DIR/lib/pkgconfig:$INSTALL_DIR/lib/i386-linux-gnu/pkgconfig meson setup $BUILD_DIR $BUILD_OPTS --prefix=$INSTALL_DIR"
 	schroot -c $2 -- sh -c "ninja -C $BUILD_DIR"
-	schroot -c $2 -- sh -c "sudo ninja -C $BUILD_DIR install"
 
-	# copy to local install directory
-	sudo cp -Tvr "${SCHROOT_PATH}${INSTALL_DIR}" "$INSTALL_DIR"
+	if [ "$DEPLOY" = "y" ]; then
+		schroot -c $2 -- sh -c "sudo ninja -C $BUILD_DIR install"
+
+		# copy to local install directory
+		sudo cp -Tvr "${SCHROOT_PATH}${INSTALL_DIR}" "$INSTALL_DIR"
+	fi
 }
 
 if [ "$DEPLOY" = "y" ]; then

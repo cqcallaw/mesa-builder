@@ -19,6 +19,7 @@ BUILD_AMD='n'
 BUILD_32='y'
 DEPLOY='y'
 DEPS='y'
+CODE_FORMAT='n'
 
 # ref: https://davetang.org/muse/2023/01/31/bash-script-that-accepts-short-long-and-positional-arguments/
 usage(){
@@ -31,6 +32,7 @@ Usage: $0
 	[ -p | --perfetto input ]
 	[ -r | --revision Mesa revision to build ]
 	[ -i | --install Path to local install ]
+	[ -f | --format Format code instead of building or deploying ]
 	[ --amd Debug AMD drivers ]
 	[ --debug Debug build ]
 	[ --dbgoptim Debug optimized build ]
@@ -43,7 +45,7 @@ EOF
 exit 1
 }
 
-args=$(getopt -a -o s:d:o:m:phr:i: --long suite:,dir:,options:,mirror:,perfetto,help,spirv-tools-tag:,spirv-headers-tag:,revision:,install:,debug,dbgoptim,amd,no32,nodeploy,nodeps -- "$@")
+args=$(getopt -a -o s:d:o:m:phr:i:f --long suite:,dir:,options:,mirror:,perfetto,help,spirv-tools-tag:,spirv-headers-tag:,revision:,install:,debug,dbgoptim,amd,no32,nodeploy,nodeps,format -- "$@")
 
 eval set -- ${args}
 while :
@@ -55,6 +57,7 @@ do
 		-o | --options)          BUILD_OPTS=$2          ; shift 2   ;;
 		-m | --mirror)           PACKAGE_MIRROR=$2      ; shift 2   ;;
 		-p | --perfetto)         BUILD_PERFETTO=y       ; shift     ;;
+		-f | --format)           CODE_FORMAT=y          ; shift     ;;
 		--amd)                   BUILD_AMD=y            ; shift     ;;
 		--debug)                 BUILD_DEBUG=y          ; shift     ;;
 		--dbgoptim)              BUILD_DEBUG_OPTIM=y    ; shift     ;;
@@ -92,6 +95,12 @@ if [ "$exit_code" -ne 0 ] ; then
 	git clone https://gitlab.freedesktop.org/mesa/mesa.git $SRC_DIR
 else
 	echo "Source already cloned."
+fi
+
+if [ "$CODE_FORMAT" = "y" ]; then
+	DEPLOY='n'
+	BUILD_32='n'
+	BUILD_DEBUG='n'
 fi
 
 if [ ! "$REV" = '' ] ; then
@@ -241,6 +250,10 @@ EOF
 		schroot -c $2 -- sh -c "sudo apt -y install libpng-dev liblua5.3-dev"
 	fi
 
+	if [ "$CODE_FORMAT" = "y" ]; then
+		schroot -c $2 -- sh -c "sudo apt -y install clang-format"
+	fi
+
 	# do the build
 	cd $SRC_DIR
 	BUILD_DIR=build-$BUILD_ID/$1
@@ -251,6 +264,12 @@ EOF
 	schroot -c $2 -- sh -c "$PASSTHROUGH_ENV meson wrap install wayland-protocols"
 
 	schroot -c $2 -- sh -c "$PASSTHROUGH_ENV PKG_CONFIG_PATH=$PKG_CONFIG_PATH:$INSTALL_DIR/lib/pkgconfig:$INSTALL_DIR/lib/i386-linux-gnu/pkgconfig meson setup $BUILD_DIR $BUILD_OPTS --prefix=$INSTALL_DIR"
+
+	if [ "$CODE_FORMAT" = "y" ]; then
+		schroot -c $2 -- sh -c "ninja -C $BUILD_DIR clang-format"
+		exit 0
+	fi
+
 	schroot -c $2 -- sh -c "ninja -C $BUILD_DIR"
 
 	if [ "$DEPLOY" = "y" ]; then

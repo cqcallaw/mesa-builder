@@ -196,7 +196,13 @@ EOF
 		fi
 
 		# add additional variables to the environment of commands run in chroot
-		$PASSTHROUGH_ENV="http_proxy=$http_proxy https_proxy=$https_proxy"
+		PASSTHROUGH_ENV=''
+		if [ -n "$http_proxy" ]; then
+			PASSTHROUGH_ENV="$PASSTHROUGH_ENV http_proxy=$http_proxy"
+		fi
+		if [ -n "$https_proxy" ]; then
+			PASSTHROUGH_ENV="$PASSTHROUGH_ENV https_proxy=$https_proxy"
+		fi
 
 		# Handle LLVM
 		schroot -c $2 -- sh -c "sudo apt -y install llvm llvm-15"

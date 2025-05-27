@@ -195,6 +195,9 @@ EOF
 			schroot -c $2 -- sh -c "git config --global --unset https.proxy || true"
 		fi
 
+		# add additional variables to the environment of commands run in chroot
+		$PASSTHROUGH_ENV="http_proxy=$http_proxy https_proxy=$https_proxy"
+
 		# Handle LLVM
 		schroot -c $2 -- sh -c "sudo apt -y install llvm llvm-15"
 		# Contemporary Mesa requires LLVM 15. Make sure it's available
@@ -204,13 +207,13 @@ EOF
 		schroot -c $2 -- sh -c "sudo apt -y install curl"
 		CARGO_HOME="/usr/local"
 		RUSTUP_HOME=$CARGO_HOME
-		schroot -c $2 -- sh -c "http_proxy=$http_proxy https_proxy=$https_proxy curl https://sh.rustup.rs -sSf | sudo http_proxy=$http_proxy https_proxy=$https_proxy RUSTUP_INIT_SKIP_PATH_CHECK='yes' RUSTUP_HOME=$RUSTUP_HOME CARGO_HOME=$CARGO_HOME sh -s -- -y"
-		schroot -c $2 -- sh -c "http_proxy=$http_proxy https_proxy=$https_proxy rustup default stable"
+		schroot -c $2 -- sh -c "$PASSTHROUGH_ENV curl https://sh.rustup.rs -sSf | sudo $PASSTHROUGH_ENV RUSTUP_INIT_SKIP_PATH_CHECK='yes' RUSTUP_HOME=$RUSTUP_HOME CARGO_HOME=$CARGO_HOME sh -s -- -y"
+		schroot -c $2 -- sh -c "$PASSTHROUGH_ENV rustup default stable"
 		schroot -c $2 -- sh -c "which rustc" # for diagnostics
 		schroot -c $2 -- sh -c "rustc --version" # for diagnostics
 		schroot -c $2 -- sh -c "rustfmt --version" # for diagnostics
-		schroot -c $2 -- sh -c "sudo http_proxy=$http_proxy https_proxy=$https_proxy RUSTUP_HOME=$RUSTUP_HOME CARGO_HOME=$CARGO_HOME cargo install bindgen-cli"
-		schroot -c $2 -- sh -c "sudo http_proxy=$http_proxy https_proxy=$https_proxy RUSTUP_HOME=$RUSTUP_HOME CARGO_HOME=$CARGO_HOME cargo install cbindgen"
+		schroot -c $2 -- sh -c "sudo $PASSTHROUGH_ENV RUSTUP_HOME=$RUSTUP_HOME CARGO_HOME=$CARGO_HOME cargo install bindgen-cli"
+		schroot -c $2 -- sh -c "sudo $PASSTHROUGH_ENV RUSTUP_HOME=$RUSTUP_HOME CARGO_HOME=$CARGO_HOME cargo install cbindgen"
 
 		# Handle SPIR-V tools
 		SPIRV_BUILD_DIR="$SPIRV_TOOLS_SRC_DIR/build-$SPIRV_TOOLS_TAG/$1"
@@ -237,11 +240,11 @@ EOF
 	BUILD_DIR=build-$BUILD_ID/$1
 	mkdir -p $BUILD_DIR
 	schroot -c $2 -- sh -c "rm -rf subprojects/libdrm.wrap"
-	schroot -c $2 -- sh -c "http_proxy=$http_proxy https_proxy=$https_proxy meson wrap install libdrm"
+	schroot -c $2 -- sh -c "$PASSTHROUGH_ENV meson wrap install libdrm"
 	schroot -c $2 -- sh -c "rm -rf subprojects/wayland-protocols.wrap"
-	schroot -c $2 -- sh -c "http_proxy=$http_proxy https_proxy=$https_proxy meson wrap install wayland-protocols"
+	schroot -c $2 -- sh -c "$PASSTHROUGH_ENV meson wrap install wayland-protocols"
 
-	schroot -c $2 -- sh -c "http_proxy=$http_proxy https_proxy=$https_proxy PKG_CONFIG_PATH=$PKG_CONFIG_PATH:$INSTALL_DIR/lib/pkgconfig:$INSTALL_DIR/lib/i386-linux-gnu/pkgconfig meson setup $BUILD_DIR $BUILD_OPTS --prefix=$INSTALL_DIR"
+	schroot -c $2 -- sh -c "$PASSTHROUGH_ENV PKG_CONFIG_PATH=$PKG_CONFIG_PATH:$INSTALL_DIR/lib/pkgconfig:$INSTALL_DIR/lib/i386-linux-gnu/pkgconfig meson setup $BUILD_DIR $BUILD_OPTS --prefix=$INSTALL_DIR"
 	schroot -c $2 -- sh -c "ninja -C $BUILD_DIR"
 
 	if [ "$DEPLOY" = "y" ]; then

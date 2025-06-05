@@ -20,6 +20,7 @@ BUILD_32='y'
 DEPLOY='y'
 DEPS='y'
 CODE_FORMAT='n'
+CCACHE='y'
 
 # ref: https://davetang.org/muse/2023/01/31/bash-script-that-accepts-short-long-and-positional-arguments/
 usage(){
@@ -39,13 +40,14 @@ Usage: $0
 	[ --no32 ]
 	[ --nodeploy ]
 	[ --nodeps ]
+	[ --noccache ]
 	[ --spirv-tools-tag input ]
 	[ --spirv-headers-tag input ]
 EOF
 exit 1
 }
 
-args=$(getopt -a -o s:d:o:m:phr:i:f --long suite:,dir:,options:,mirror:,perfetto,help,spirv-tools-tag:,spirv-headers-tag:,revision:,install:,debug,dbgoptim,amd,no32,nodeploy,nodeps,format -- "$@")
+args=$(getopt -a -o s:d:o:m:phr:i:f --long suite:,dir:,options:,mirror:,perfetto,help,spirv-tools-tag:,spirv-headers-tag:,revision:,install:,debug,dbgoptim,amd,no32,nodeploy,nodeps,format,noccache -- "$@")
 
 eval set -- ${args}
 while :
@@ -64,6 +66,7 @@ do
 		--no32)                  BUILD_32=n             ; shift     ;;
 		--nodeploy)              DEPLOY=n               ; shift     ;;
 		--nodeps)                DEPS=n                 ; shift     ;;
+		--noccache)              CCACHE=n               ; shift     ;;
 		--spirv-tools-tag)       SPIRV_TOOLS_TAG=$2     ; shift 2   ;;
 		--spirv-headers-tag)     SPIRV_HEADERS_TAG=$2   ; shift 2   ;;
 		-r | --revision)         REV=$2                 ; shift 2   ;;
@@ -213,6 +216,14 @@ EOF
 			PASSTHROUGH_ENV="$PASSTHROUGH_ENV https_proxy=$https_proxy"
 		fi
 
+		if [ "$CCACHE" = "y" ]; then
+			if [ "$1" = "amd64" ]; then
+				# install only for 64-bit; ccache isn't available in the i386 package repo
+				schroot -c $2 -- sh -c "sudo apt -y install ccache"
+				PASSTHROUGH_ENV="CMAKE_CXX_COMPILER_LAUNCHER=ccache $PASSTHROUGH_ENV"
+			fi
+		fi
+
 		# Handle LLVM
 		schroot -c $2 -- sh -c "sudo apt -y install llvm llvm-15"
 		# Contemporary Mesa requires LLVM 15. Make sure it's available
@@ -240,11 +251,11 @@ EOF
 		schroot -c $2 -- sh -c "git -C $SPIRV_HEADERS_SRC_DIR fetch --tags"
 		schroot -c $2 -- sh -c "git -C $SPIRV_HEADERS_SRC_DIR checkout $SPIRV_HEADERS_TAG"
 		# Configure
-		schroot -c $2 -- sh -c "cmake -B$SPIRV_BUILD_DIR -H$SPIRV_TOOLS_SRC_DIR -DCMAKE_INSTALL_PREFIX=$INSTALL_DIR"
+		schroot -c $2 -- sh -c "$PASSTHROUGH_ENV cmake -B$SPIRV_BUILD_DIR -H$SPIRV_TOOLS_SRC_DIR -DCMAKE_INSTALL_PREFIX=$INSTALL_DIR"
 		# Build
-		schroot -c $2 -- sh -c "CMAKE_CXX_FLAGS=-m32 LINK_FLAGS=-m32 cmake --build $SPIRV_BUILD_DIR --parallel `nproc`"
+		schroot -c $2 -- sh -c "$PASSTHROUGH_ENV CMAKE_CXX_FLAGS=-m32 LINK_FLAGS=-m32 cmake --build $SPIRV_BUILD_DIR --parallel `nproc`"
 		# Install
-		schroot -c $2 -- sh -c "sudo cmake --build $SPIRV_BUILD_DIR --target install"
+		schroot -c $2 -- sh -c "$PASSTHROUGH_ENV sudo cmake --build $SPIRV_BUILD_DIR --target install"
 
 		# Handle miscellaneous deps
 		schroot -c $2 -- sh -c "sudo apt -y install libpng-dev liblua5.3-dev"

@@ -12,6 +12,7 @@ PACKAGE_MIRROR="http://archive.ubuntu.com/ubuntu"
 BUILD_PERFETTO=false
 SPIRV_TOOLS_TAG="v2024.4.rc2"
 SPIRV_HEADERS_TAG="vulkan-sdk-1.4.304.0"
+SPIRV_LLVM_TAG="v20.1.3"
 REV=''
 BUILD_DEBUG='n'
 BUILD_DEBUG_OPTIM='n'
@@ -87,6 +88,8 @@ SPIRV_TOOLS_SRC_URL="https://github.com/KhronosGroup/SPIRV-Tools.git"
 SPIRV_TOOLS_SRC_DIR="$HOME/src/spirv-tools"
 SPIRV_HEADERS_SRC_URL="https://github.com/KhronosGroup/SPIRV-Headers.git"
 SPIRV_HEADERS_SRC_DIR="$SPIRV_TOOLS_SRC_DIR/external/spirv-headers"
+SPIRV_LLVM_SRC_URL="https://github.com/KhronosGroup/SPIRV-LLVM-Translator.git"
+SPIRV_LLVM_SRC_DIR="$HOME/src/spirv-llvm-translator"
 
 set +e # allow errors temporarily
 git -C $SRC_DIR rev-parse 2>/dev/null
@@ -142,6 +145,35 @@ fi
 DRIVER_OPTS="-Dvulkan-drivers=$VULKAN_DRIVERS -Dgallium-drivers=$GALLIUM_DRIVERS"
 
 BUILD_OPTS="$BUILD_OPTS $DRIVER_OPTS"
+
+install_spirv_deps() {
+	# $1: The name of the schroot environment
+	# $2: Extra environment variables to pass to the commands
+
+	# Handle SPIR-V tools
+	SPIRV_BUILD_DIR="$SPIRV_TOOLS_SRC_DIR/build-$SPIRV_TOOLS_TAG/$1"
+	schroot -c $1 -- sh -c "sudo apt -y install cmake"
+	schroot -c $1 -- sh -c "git -C $SPIRV_TOOLS_SRC_DIR pull origin main || git clone $SPIRV_TOOLS_SRC_URL $SPIRV_TOOLS_SRC_DIR"
+	schroot -c $1 -- sh -c "git -C $SPIRV_TOOLS_SRC_DIR fetch --tags"
+	schroot -c $1 -- sh -c "git -C $SPIRV_TOOLS_SRC_DIR checkout $SPIRV_TOOLS_TAG"
+	schroot -c $1 -- sh -c "git -C $SPIRV_HEADERS_SRC_DIR pull origin main || git clone $SPIRV_HEADERS_SRC_URL $SPIRV_HEADERS_SRC_DIR"
+	schroot -c $1 -- sh -c "git -C $SPIRV_HEADERS_SRC_DIR fetch --tags"
+	schroot -c $1 -- sh -c "git -C $SPIRV_HEADERS_SRC_DIR checkout $SPIRV_HEADERS_TAG"
+	# Configure
+	schroot -c $1 -- sh -c "$2 cmake -B$SPIRV_BUILD_DIR -H$SPIRV_TOOLS_SRC_DIR -DCMAKE_INSTALL_PREFIX=$INSTALL_DIR"
+	# Build
+	schroot -c $1 -- sh -c "$2 CMAKE_CXX_FLAGS=-m32 LINK_FLAGS=-m32 cmake --build $SPIRV_BUILD_DIR --parallel `nproc`"
+	# Install
+	schroot -c $1 -- sh -c "$2 sudo cmake --build $SPIRV_BUILD_DIR --target install"
+
+	# # Handle SPIR-V to LLVM translator
+	case "$1" in
+		*"plucky"*)
+		schroot -c $1 -- sh -c "sudo apt -y install libllvmspirvlib-20-dev"
+		;;
+		*) ;; # do nothing for other environments
+	esac
+}
 
 build_mesa() {
 	# $1: The schroot architecure
@@ -207,6 +239,8 @@ EOF
 			schroot -c $2 -- sh -c "git config --global --unset https.proxy || true"
 		fi
 
+		schroot -c $2 -- sh -c "git config --global pull.rebase false"
+
 		# add additional variables to the environment of commands run in chroot
 		PASSTHROUGH_ENV=''
 		if [ -n "$http_proxy" ]; then
@@ -225,9 +259,12 @@ EOF
 		fi
 
 		# Handle LLVM
-		schroot -c $2 -- sh -c "sudo apt -y install llvm llvm-15"
-		# Contemporary Mesa requires LLVM 15. Make sure it's available
-		schroot -c $2 -- sh -c "sudo update-alternatives --install /usr/bin/llvm-config llvm-config /usr/lib/llvm-15/bin/llvm-config 200"
+		schroot -c $2 -- sh -c "sudo apt -y install llvm llvm-dev"
+
+		# Handle clang
+		schroot -c $2 -- sh -c "sudo apt -y install libclang-dev libclang-cpp-dev"
+
+		install_spirv_deps "$2" "$PASSTHROUGH_ENV"
 
 		# Handle Rust
 		schroot -c $2 -- sh -c "sudo apt -y install curl"
@@ -240,22 +277,6 @@ EOF
 		schroot -c $2 -- sh -c "rustfmt --version" # for diagnostics
 		schroot -c $2 -- sh -c "sudo $PASSTHROUGH_ENV RUSTUP_HOME=$RUSTUP_HOME CARGO_HOME=$CARGO_HOME cargo install bindgen-cli"
 		schroot -c $2 -- sh -c "sudo $PASSTHROUGH_ENV RUSTUP_HOME=$RUSTUP_HOME CARGO_HOME=$CARGO_HOME cargo install cbindgen"
-
-		# Handle SPIR-V tools
-		SPIRV_BUILD_DIR="$SPIRV_TOOLS_SRC_DIR/build-$SPIRV_TOOLS_TAG/$1"
-		schroot -c $2 -- sh -c "sudo apt -y install cmake"
-		schroot -c $2 -- sh -c "git -C $SPIRV_TOOLS_SRC_DIR pull origin main || git clone $SPIRV_TOOLS_SRC_URL $SPIRV_TOOLS_SRC_DIR"
-		schroot -c $2 -- sh -c "git -C $SPIRV_TOOLS_SRC_DIR fetch --tags"
-		schroot -c $2 -- sh -c "git -C $SPIRV_TOOLS_SRC_DIR checkout $SPIRV_TOOLS_TAG"
-		schroot -c $2 -- sh -c "git -C $SPIRV_HEADERS_SRC_DIR pull origin main || git clone $SPIRV_HEADERS_SRC_URL $SPIRV_HEADERS_SRC_DIR"
-		schroot -c $2 -- sh -c "git -C $SPIRV_HEADERS_SRC_DIR fetch --tags"
-		schroot -c $2 -- sh -c "git -C $SPIRV_HEADERS_SRC_DIR checkout $SPIRV_HEADERS_TAG"
-		# Configure
-		schroot -c $2 -- sh -c "$PASSTHROUGH_ENV cmake -B$SPIRV_BUILD_DIR -H$SPIRV_TOOLS_SRC_DIR -DCMAKE_INSTALL_PREFIX=$INSTALL_DIR"
-		# Build
-		schroot -c $2 -- sh -c "$PASSTHROUGH_ENV CMAKE_CXX_FLAGS=-m32 LINK_FLAGS=-m32 cmake --build $SPIRV_BUILD_DIR --parallel `nproc`"
-		# Install
-		schroot -c $2 -- sh -c "$PASSTHROUGH_ENV sudo cmake --build $SPIRV_BUILD_DIR --target install"
 
 		# Handle miscellaneous deps
 		schroot -c $2 -- sh -c "sudo apt -y install libpng-dev liblua5.3-dev"

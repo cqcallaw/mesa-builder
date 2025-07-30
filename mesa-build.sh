@@ -18,6 +18,7 @@ BUILD_DEBUG='n'
 BUILD_DEBUG_OPTIM='n'
 BUILD_AMD='n'
 BUILD_32='y'
+INSTALL='y'
 DEPLOY='y'
 DEPS='y'
 CODE_FORMAT='n'
@@ -39,6 +40,7 @@ Usage: $0
 	[ --debug Debug build ]
 	[ --dbgoptim Debug optimized build ]
 	[ --no32 ]
+	[ --noinstall ]
 	[ --nodeploy ]
 	[ --nodeps ]
 	[ --noccache ]
@@ -48,7 +50,7 @@ EOF
 exit 1
 }
 
-args=$(getopt -a -o s:d:o:m:phr:i:f --long suite:,dir:,options:,mirror:,perfetto,help,spirv-tools-tag:,spirv-headers-tag:,revision:,install:,debug,dbgoptim,amd,no32,nodeploy,nodeps,format,noccache -- "$@")
+args=$(getopt -a -o s:d:o:m:phr:i:f --long suite:,dir:,options:,mirror:,perfetto,help,spirv-tools-tag:,spirv-headers-tag:,revision:,install:,debug,dbgoptim,amd,no32,noinstall,nodeploy,nodeps,format,noccache -- "$@")
 
 eval set -- ${args}
 while :
@@ -65,6 +67,7 @@ do
 		--debug)                 BUILD_DEBUG=y          ; shift     ;;
 		--dbgoptim)              BUILD_DEBUG_OPTIM=y    ; shift     ;;
 		--no32)                  BUILD_32=n             ; shift     ;;
+		--noinstall)             INSTALL=n; DEPLOY=n    ; shift     ;;
 		--nodeploy)              DEPLOY=n               ; shift     ;;
 		--nodeps)                DEPS=n                 ; shift     ;;
 		--noccache)              CCACHE=n               ; shift     ;;
@@ -303,10 +306,10 @@ EOF
 	fi
 
 	schroot -c $2 -- sh -c "ninja -C $BUILD_DIR"
-
-	if [ "$DEPLOY" = "y" ]; then
+	if [ "$INSTALL" = "y" ]; then
 		schroot -c $2 -- sh -c "sudo ninja -C $BUILD_DIR install"
-
+	fi
+	if [ "$DEPLOY" = "y" ]; then
 		# copy to local install directory
 		sudo cp -Tvr "${SCHROOT_PATH}${INSTALL_DIR}" "$INSTALL_DIR"
 	fi

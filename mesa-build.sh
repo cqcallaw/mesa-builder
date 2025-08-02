@@ -6,6 +6,7 @@ set -x # echo commands
 SUITE=$(lsb_release --codename --short)
 SRC_DIR="$HOME/src/mesa"
 BUILD_OPTS="-Dglvnd=enabled -Dvalgrind=disabled -Dvulkan-layers=device-select,intel-nullhw,overlay,screenshot -Dintel-clc=enabled -Dintel-rt=enabled -Dtools=intel"
+BUILD_OPTS_32="-Dglvnd=enabled -Dvalgrind=disabled -Dvulkan-layers=device-select,intel-nullhw,overlay,screenshot"
 VULKAN_DRIVERS="intel"
 GALLIUM_DRIVERS="iris"
 PACKAGE_MIRROR="http://archive.ubuntu.com/ubuntu"
@@ -50,7 +51,7 @@ EOF
 exit 1
 }
 
-args=$(getopt -a -o s:d:o:m:phr:i:f --long suite:,dir:,options:,mirror:,perfetto,help,spirv-tools-tag:,spirv-headers-tag:,revision:,install:,debug,dbgoptim,amd,no32,noinstall,nodeploy,nodeps,format,noccache -- "$@")
+args=$(getopt -a -o s:d:o:m:phr:i:f --long suite:,dir:,options:,mirror:,perfetto,help,spirv-tools-tag:,spirv-headers-tag:,revision:,install:,debug,dbgoptim,amd,no32,noinstall,nodeploy,nodeps,options32,format,noccache -- "$@")
 
 eval set -- ${args}
 while :
@@ -71,6 +72,7 @@ do
 		--nodeploy)              DEPLOY=n               ; shift     ;;
 		--nodeps)                DEPS=n                 ; shift     ;;
 		--noccache)              CCACHE=n               ; shift     ;;
+		--options32)             BUILD_OPTS_32=$2       ; shift 2   ;;
 		--spirv-tools-tag)       SPIRV_TOOLS_TAG=$2     ; shift 2   ;;
 		--spirv-headers-tag)     SPIRV_HEADERS_TAG=$2   ; shift 2   ;;
 		-r | --revision)         REV=$2                 ; shift 2   ;;
@@ -122,17 +124,21 @@ BUILD_ID=`git -C $SRC_DIR describe --always --tags`
 
 if [ "$BUILD_PERFETTO" = "y" ]; then
 	BUILD_OPTS="$BUILD_OPTS -Dperfetto=true"
+	BUILD_OPTS_32="$BUILD_OPTS -Dperfetto=true"
 	BUILD_ID="$BUILD_ID+perfetto"
 fi
 
 if [ "$BUILD_DEBUG" = "y" ]; then
         BUILD_OPTS="$BUILD_OPTS --buildtype=debug"
+        BUILD_OPTS_32="$BUILD_OPTS_32 --buildtype=debug"
         BUILD_ID="$BUILD_ID+debug"
 elif [ "$BUILD_DEBUG_OPTIM" = "y" ]; then
         BUILD_OPTS="$BUILD_OPTS --buildtype=debugoptimized"
+        BUILD_OPTS_32="$BUILD_OPTS_32 --buildtype=debugoptimized"
         BUILD_ID="$BUILD_ID+dbg-optim"
 else
 	BUILD_OPTS="$BUILD_OPTS --buildtype=release"
+	BUILD_OPTS_32="$BUILD_OPTS_32 --buildtype=release"
 fi
 
 if [ -z "$INSTALL_DIR" ]; then
@@ -148,6 +154,7 @@ fi
 DRIVER_OPTS="-Dvulkan-drivers=$VULKAN_DRIVERS -Dgallium-drivers=$GALLIUM_DRIVERS"
 
 BUILD_OPTS="$BUILD_OPTS $DRIVER_OPTS"
+BUILD_OPTS_32="$BUILD_OPTS_32 $DRIVER_OPTS"
 
 install_spirv_deps() {
 	# $1: The name of the schroot environment
@@ -182,6 +189,7 @@ build_mesa() {
 	# $1: The schroot architecure
 	# $2: The name of the schroot environment
 	# $3: The schroot personality
+	# $4: The build options
 	# ref: https://unix.stackexchange.com/questions/12956/how-do-i-run-32-bit-programs-on-a-64-bit-debian-ubuntu
 	SCHROOT_PATH="/build/$SUITE/$1"
 
@@ -298,7 +306,7 @@ EOF
 	schroot -c $2 -- sh -c "rm -rf subprojects/wayland-protocols.wrap"
 	schroot -c $2 -- sh -c "$PASSTHROUGH_ENV meson wrap install wayland-protocols"
 
-	schroot -c $2 -- sh -c "$PASSTHROUGH_ENV PKG_CONFIG_PATH=$PKG_CONFIG_PATH:$INSTALL_DIR/lib/pkgconfig:$INSTALL_DIR/lib/i386-linux-gnu/pkgconfig meson setup $BUILD_DIR $BUILD_OPTS --prefix=$INSTALL_DIR"
+	schroot -c $2 -- sh -c "$PASSTHROUGH_ENV PKG_CONFIG_PATH=$PKG_CONFIG_PATH:$INSTALL_DIR/lib/pkgconfig:$INSTALL_DIR/lib/i386-linux-gnu/pkgconfig meson setup $BUILD_DIR $4 --prefix=$INSTALL_DIR"
 
 	if [ "$CODE_FORMAT" = "y" ]; then
 		schroot -c $2 -- sh -c "ninja -C $BUILD_DIR clang-format"
@@ -334,10 +342,10 @@ if [ "$DEPLOY" = "y" ]; then
 fi
 
 if [ "$BUILD_32" = "y" ]; then
-	build_mesa "i386" "${SUITE}32" "linux32"
+	build_mesa "i386" "${SUITE}32" "linux32" "$BUILD_OPTS_32"
 fi
-# build 64 bit last so 64b tools are installed
-build_mesa "amd64" "${SUITE}64" "linux"
+# build 64 bit last so 64b tools are always installed
+build_mesa "amd64" "${SUITE}64" "linux" "$BUILD_OPTS"
 
 if [ "$BUILD_PERFETTO" = "y" ]; then
 	# ref: https://docs.mesa3d.org/perfetto.html

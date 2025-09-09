@@ -178,6 +178,9 @@ install_spirv_deps() {
 
 	# # Handle SPIR-V to LLVM translator
 	case "$1" in
+		*"noble"*)
+		schroot -c $1 -- sh -c "sudo apt -y install libllvmspirvlib-19-dev"
+		;
 		*"plucky"*)
 		schroot -c $1 -- sh -c "sudo apt -y install libllvmspirvlib-20-dev"
 		;;

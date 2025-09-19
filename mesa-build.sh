@@ -24,6 +24,7 @@ DEPLOY='y'
 DEPS='y'
 CODE_FORMAT='n'
 CCACHE='y'
+BUILD_DOCS='n'
 
 # ref: https://davetang.org/muse/2023/01/31/bash-script-that-accepts-short-long-and-positional-arguments/
 usage(){
@@ -38,6 +39,7 @@ Usage: $0
 	[ -i | --install Path to local install ]
 	[ -f | --format Format code instead of building or deploying ]
 	[ --amd Debug AMD drivers ]
+	[ --docs Build docs ]
 	[ --debug Debug build ]
 	[ --dbgoptim Debug optimized build ]
 	[ --no32 ]
@@ -51,7 +53,7 @@ EOF
 exit 1
 }
 
-args=$(getopt -a -o s:d:o:m:phr:i:f --long suite:,dir:,options:,mirror:,perfetto,help,spirv-tools-tag:,spirv-headers-tag:,revision:,install:,debug,dbgoptim,amd,no32,noinstall,nodeploy,nodeps,options32,format,noccache -- "$@")
+args=$(getopt -a -o s:d:o:m:phr:i:f --long suite:,dir:,options:,mirror:,perfetto,help,spirv-tools-tag:,spirv-headers-tag:,revision:,install:,debug,dbgoptim,amd,docs,no32,noinstall,nodeploy,nodeps,options32,format,noccache -- "$@")
 
 eval set -- ${args}
 while :
@@ -65,6 +67,7 @@ do
 		-p | --perfetto)         BUILD_PERFETTO=y       ; shift     ;;
 		-f | --format)           CODE_FORMAT=y          ; shift     ;;
 		--amd)                   BUILD_AMD=y            ; shift     ;;
+		--docs)                  BUILD_DOCS=y           ; shift     ;;
 		--debug)                 BUILD_DEBUG=y          ; shift     ;;
 		--dbgoptim)              BUILD_DEBUG_OPTIM=y    ; shift     ;;
 		--no32)                  BUILD_32=n             ; shift     ;;
@@ -195,6 +198,7 @@ build_mesa() {
 	# $4: The build options
 	# ref: https://unix.stackexchange.com/questions/12956/how-do-i-run-32-bit-programs-on-a-64-bit-debian-ubuntu
 	SCHROOT_PATH="/build/$SUITE/$1"
+	LOCAL_BUILD_OPTS="$4"
 
 	if [ "$DEPS" = "n" ]; then
 		echo "Skipping dependency installation."
@@ -300,6 +304,14 @@ EOF
 		schroot -c $2 -- sh -c "sudo apt -y install clang-format"
 	fi
 
+	if [ "$BUILD_DOCS" = "y" ]; then
+		schroot -c $2 -- sh -c "sudo apt -y install python3-clang python3-sphinx python3-pip"
+		schroot -c $2 -- sh -c "pip install --break-system-packages hawkmoth"
+		LOCAL_BUILD_OPTS="$LOCAL_BUILD_OPTS -Dhtml-docs=enabled"
+	else
+		schroot -c $2 -- sh -c "sudo apt -y remove python3-sphinx"
+	fi
+
 	# do the build
 	cd $SRC_DIR
 	BUILD_DIR=build-$BUILD_ID/$1
@@ -309,7 +321,7 @@ EOF
 	schroot -c $2 -- sh -c "rm -rf subprojects/wayland-protocols.wrap"
 	schroot -c $2 -- sh -c "$PASSTHROUGH_ENV meson wrap install wayland-protocols"
 
-	schroot -c $2 -- sh -c "$PASSTHROUGH_ENV PKG_CONFIG_PATH=$PKG_CONFIG_PATH:$INSTALL_DIR/lib/pkgconfig:$INSTALL_DIR/lib/i386-linux-gnu/pkgconfig meson setup $BUILD_DIR $4 --prefix=$INSTALL_DIR"
+	schroot -c $2 -- sh -c "$PASSTHROUGH_ENV PKG_CONFIG_PATH=$PKG_CONFIG_PATH:$INSTALL_DIR/lib/pkgconfig:$INSTALL_DIR/lib/i386-linux-gnu/pkgconfig meson setup $BUILD_DIR $LOCAL_BUILD_OPTS --prefix=$INSTALL_DIR"
 
 	if [ "$CODE_FORMAT" = "y" ]; then
 		schroot -c $2 -- sh -c "ninja -C $BUILD_DIR clang-format"

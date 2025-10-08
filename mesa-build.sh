@@ -127,7 +127,7 @@ BUILD_ID=`git -C $SRC_DIR describe --always --tags`
 
 if [ "$BUILD_PERFETTO" = "y" ]; then
 	BUILD_OPTS="$BUILD_OPTS -Dperfetto=true"
-	BUILD_OPTS_32="$BUILD_OPTS -Dperfetto=true"
+	BUILD_OPTS_32="$BUILD_OPTS_32 -Dperfetto=true"
 	BUILD_ID="$BUILD_ID+perfetto"
 fi
 

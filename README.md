@@ -24,7 +24,7 @@ Builds are deployed to `/usr/local-$(git describe --always --tags)` by default. 
 
 ```
 # Use an alternate package mirror
-~/src/mesa-builder/mesa-build.sh --mirror http://linux-ftp.fi.intel.com/pub/mirrors/ubuntu
+~/src/mesa-builder/mesa-build.sh --mirror http://linux-ftp.jf.intel.com/pub/mirrors/ubuntu
 
 # Build a specific Mesa tag (git SHAs work too)
 ~/src/mesa-builder/mesa-build.sh --revision mesa-24.3.4

@@ -39,7 +39,9 @@ Builds are deployed to `/usr/local-$(git describe --always --tags)` by default. 
 ~/src/mesa-builder/mesa-build.sh --nodeploy
 
 # Install to a temporary directory and don't update the /usr/local path
-~/src/mesa-builder/mesa-build.sh --nodeploy --install /tmp/mesa-$(git describe --tags --always)
+# LD_LIBRARY_PATH, LIBGL_DRIVERS_PATH, and VK_ICD_FILENAMES env vars
+# MUST be set properly for workloads to utilize this temporary build 
+~/src/mesa-builder/mesa-build.sh --nodeploy --install /tmp/mesa-wip
 
 # Build without building deps (fast, but may fail)
 ~/src/mesa-builder/mesa-build.sh --nodeps

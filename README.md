@@ -1,5 +1,5 @@
 # Mesa Builder
-A script to build and deploy Mesa on Ubuntu using chroot.
+Scripts to build and deploy Mesa on Ubuntu using chroot.
 
 Builds are deployed to `/usr/local-$(git describe --always --tags)` by default. `/usr/local` is converted to a symlink that points to the most recent build.
 
@@ -24,7 +24,7 @@ Builds are deployed to `/usr/local-$(git describe --always --tags)` by default. 
 
 ```
 # Use an alternate package mirror
-~/src/mesa-builder/mesa-build.sh --mirror http://linux-ftp.jf.intel.com/pub/mirrors/ubuntu
+~/src/mesa-builder/mesa-build.sh --mirror http://linux-ftp.intel.com/pub/mirrors/ubuntu
 
 # Build a specific Mesa tag (git SHAs work too)
 ~/src/mesa-builder/mesa-build.sh --revision mesa-24.3.4
@@ -37,6 +37,9 @@ Builds are deployed to `/usr/local-$(git describe --always --tags)` by default. 
 
 # Build without deploying
 ~/src/mesa-builder/mesa-build.sh --nodeploy
+
+# Install to a temporary directory and don't update the /usr/local path
+~/src/mesa-builder/mesa-build.sh --nodeploy --install /tmp/mesa-$(git describe --tags --always)
 
 # Build without building deps (fast, but may fail)
 ~/src/mesa-builder/mesa-build.sh --nodeps

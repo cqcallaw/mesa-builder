@@ -350,7 +350,7 @@ if [ "$DEPLOY" = "y" ]; then
 		else
 			set +x
 			echo "Warning: /usr/local is not a symlink. Deploy cannot continue."
-			echo "Please remove /usr/local and re-run the script."
+			echo "Please remove or rename /usr/local and re-run the script."
 			exit 1
 		fi
 	fi

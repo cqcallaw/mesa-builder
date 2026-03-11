@@ -66,6 +66,6 @@ taskset -c 0-8 ~/src/mesa-builder/mesa-build.sh
 
 ```
 # clean up lingering mount points from chroot early termination
-sudo find /run/schroot/mount/ \( -name proc -o -name pts -o -name home -o -name sys -o -name dev -o -name tmp -o -name secondary_store \) -exec umount {} \;
+sudo find /run/schroot/mount/ \( -name proc -o -name pts -o -name home -o -name sys -o -name dev -o -name tmp -o -name devtmpfs -o -name secondary_store \) -exec umount {} \;
 sudo umount /run/schroot/mount/*
 ```

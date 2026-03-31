@@ -163,6 +163,17 @@ install_spirv_deps() {
 	# $1: The name of the schroot environment
 	# $2: Extra environment variables to pass to the commands
 
+	# Use ccache for 64-bit builds (ccache package unavailable in i386 Ubuntu repo)
+	SPIRV_CCACHE_FLAGS=""
+	case "$1" in
+		*64*)
+			if [ "$CCACHE" = "y" ]; then
+				schroot -c $1 -- sh -c "sudo apt -y install ccache"
+				SPIRV_CCACHE_FLAGS="-DCMAKE_C_COMPILER_LAUNCHER=ccache -DCMAKE_CXX_COMPILER_LAUNCHER=ccache"
+			fi
+			;;
+	esac
+
 	# Handle SPIR-V tools
 	SPIRV_BUILD_DIR="$SPIRV_TOOLS_SRC_DIR/build-$SPIRV_TOOLS_TAG/$1"
 	schroot -c $1 -- sh -c "sudo apt -y install cmake"
@@ -173,7 +184,7 @@ install_spirv_deps() {
 	schroot -c $1 -- sh -c "git -C $SPIRV_HEADERS_SRC_DIR fetch --tags"
 	schroot -c $1 -- sh -c "git -C $SPIRV_HEADERS_SRC_DIR checkout $SPIRV_HEADERS_TAG"
 	# Configure
-	schroot -c $1 -- sh -c "$2 cmake -B$SPIRV_BUILD_DIR -H$SPIRV_TOOLS_SRC_DIR -DCMAKE_INSTALL_PREFIX=$INSTALL_DIR"
+	schroot -c $1 -- sh -c "$2 cmake -B$SPIRV_BUILD_DIR -H$SPIRV_TOOLS_SRC_DIR -DCMAKE_INSTALL_PREFIX=$INSTALL_DIR $SPIRV_CCACHE_FLAGS"
 	# Build
 	schroot -c $1 -- sh -c "$2 CMAKE_CXX_FLAGS=-m32 LINK_FLAGS=-m32 cmake --build $SPIRV_BUILD_DIR --parallel `nproc`"
 	# Install

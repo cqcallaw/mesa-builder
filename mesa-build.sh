@@ -343,10 +343,8 @@ EOF
 	if [ "$INSTALL" = "y" ]; then
 		schroot -c $2 -- sh -c "sudo ninja -C $BUILD_DIR install"
 	fi
-	if [ "$DEPLOY" = "y" ]; then
-		# copy to local install directory
-		sudo cp -Tvr "${SCHROOT_PATH}${INSTALL_DIR}" "$INSTALL_DIR"
-	fi
+
+	sudo cp -Tvr "${SCHROOT_PATH}${INSTALL_DIR}" "$INSTALL_DIR"
 }
 
 if [ "$DEPLOY" = "y" ]; then

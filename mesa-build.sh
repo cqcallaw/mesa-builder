@@ -302,8 +302,11 @@ EOF
 		schroot -c $2 -- sh -c "$PASSTHROUGH_ENV curl https://sh.rustup.rs -sSf | sudo $PASSTHROUGH_ENV RUSTUP_INIT_SKIP_PATH_CHECK='yes' RUSTUP_HOME=$RUSTUP_HOME CARGO_HOME=$CARGO_HOME sh -s -- -y"
 		schroot -c $2 -- sh -c "$PASSTHROUGH_ENV rustup default stable"
 		schroot -c $2 -- sh -c "which rustc" # for diagnostics
+		sleep 1 # give the filesystem a moment to catch up before running rustc
 		schroot -c $2 -- sh -c "rustc --version" # for diagnostics
+		sleep 1 # give the filesystem a moment to catch up before running rustfmt
 		schroot -c $2 -- sh -c "rustfmt --version" # for diagnostics
+		sleep 1 # give the filesystem a moment to catch up before running cargo
 		schroot -c $2 -- sh -c "sudo $PASSTHROUGH_ENV RUSTUP_HOME=$RUSTUP_HOME CARGO_HOME=$CARGO_HOME cargo install bindgen-cli"
 		schroot -c $2 -- sh -c "sudo $PASSTHROUGH_ENV RUSTUP_HOME=$RUSTUP_HOME CARGO_HOME=$CARGO_HOME cargo install cbindgen"
 

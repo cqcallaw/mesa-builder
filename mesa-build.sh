@@ -390,4 +390,10 @@ fi
 
 if [ "$DEPLOY" = "y" ]; then
 	sudo ln -sfn $INSTALL_DIR /usr/local
+	# Refresh the linker cache so the version-named libgallium-<VERSION>.so under
+	# /usr/local/lib is resolvable. /usr/local/lib is on the ld.so search path, so
+	# the DRI/gbm loader relies on the ldconfig cache to dlopen libgallium. Without
+	# this, a Mesa VERSION bump renames the lib, the stale cache misses it, and
+	# gbm_create_device() fails -> the compositor (mutter/kwin) crash-loops.
+	sudo ldconfig
 fi

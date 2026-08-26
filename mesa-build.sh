@@ -3,7 +3,19 @@
 set -e # terminate on errors
 set -x # echo commands
 
-SUITE=$(lsb_release --codename --short)
+if [ -r /etc/os-release ]; then
+	. /etc/os-release
+fi
+
+DISTRO_ID=${ID:-}
+case "$DISTRO_ID" in
+	arch|cachyos)
+		SUITE=arch
+		;;
+	*)
+		SUITE=$(lsb_release --codename --short)
+		;;
+esac
 SRC_DIR="$HOME/src/mesa"
 BUILD_OPTS="-Dglvnd=enabled -Dvalgrind=disabled -Dvulkan-layers=device-select,intel-nullhw,overlay,screenshot -Dintel-rt=enabled -Dtools=intel"
 BUILD_OPTS_32="-Dglvnd=enabled -Dvalgrind=disabled -Dvulkan-layers=device-select,intel-nullhw,overlay,screenshot"
@@ -25,6 +37,32 @@ DEPS='y'
 CODE_FORMAT='n'
 CCACHE='y'
 BUILD_DOCS='n'
+
+install_arch_deps() {
+	if [ "$DEPS" = "n" ]; then
+		echo "Skipping dependency installation."
+		return
+	fi
+
+	# Arch uses one native environment; multilib packages provide the 32-bit build.
+	# "rust" already provides cargo/rustfmt; naming them too causes a rust-vs-rustup provider prompt.
+	sudo pacman --needed --noconfirm -S \
+		base-devel git meson ninja cmake llvm clang rust \
+		python-mako python-packaging python-pyyaml libpng lua libglvnd vulkan-headers \
+		spirv-tools spirv-headers wayland-protocols
+	if [ "$BUILD_32" = "y" ]; then
+		# gcc already supports -m32; libX11-xcb ships inside lib32-libx11 and lib32-libvdpau doesn't exist.
+		sudo pacman --needed --noconfirm -S lib32-llvm lib32-libdrm lib32-libglvnd \
+			lib32-vulkan-icd-loader lib32-libx11 lib32-libxext lib32-libxdamage \
+			lib32-libxfixes lib32-libxshmfence lib32-libxxf86vm lib32-libxrandr \
+			lib32-libxcb lib32-libxv lib32-wayland lib32-libva \
+			lib32-expat lib32-libelf lib32-libunwind
+	fi
+
+	# bindgen-cli/cbindgen aren't official packages; install like the Ubuntu path does.
+	cargo install bindgen-cli
+	cargo install cbindgen
+}
 
 # ref: https://davetang.org/muse/2023/01/31/bash-script-that-accepts-short-long-and-positional-arguments/
 usage(){
@@ -202,12 +240,148 @@ install_spirv_deps() {
 	esac
 }
 
+install_spirv_deps_arch() {
+	# Arch has no llvmspirvlib package; build SPIRV-Tools and the SPIR-V/LLVM
+	# translator from source and install into INSTALL_DIR so meson finds them
+	# via pkg-config. This is the native intel_clc build tool, so one install
+	# covers both the i386 and amd64 sub-builds.
+	if [ "$DEPS" = "n" ]; then
+		return
+	fi
+	if [ -f "$INSTALL_DIR/lib/pkgconfig/LLVMSPIRVLib.pc" ]; then
+		echo "SPIR-V deps already installed."
+		return
+	fi
+
+	SPIRV_BUILD_DIR="$SPIRV_TOOLS_SRC_DIR/build-$SPIRV_TOOLS_TAG"
+	# We always checkout a specific tag below, so clone-if-missing + fetch is
+	# enough; a plain pull can fail on a repo left in a detached-tag state.
+	[ -d "$SPIRV_TOOLS_SRC_DIR" ] || git clone "$SPIRV_TOOLS_SRC_URL" "$SPIRV_TOOLS_SRC_DIR"
+	git -C "$SPIRV_TOOLS_SRC_DIR" fetch --tags
+	git -C "$SPIRV_TOOLS_SRC_DIR" checkout "$SPIRV_TOOLS_TAG"
+	[ -d "$SPIRV_HEADERS_SRC_DIR" ] || git clone "$SPIRV_HEADERS_SRC_URL" "$SPIRV_HEADERS_SRC_DIR"
+	git -C "$SPIRV_HEADERS_SRC_DIR" fetch --tags
+	git -C "$SPIRV_HEADERS_SRC_DIR" checkout "$SPIRV_HEADERS_TAG"
+	# SPIRV_WERROR=OFF: newer GCC's -Warray-bounds false-positives in timer.h
+	# would otherwise fail the build since SPIRV-Tools builds with -Werror.
+	cmake -B "$SPIRV_BUILD_DIR" -H"$SPIRV_TOOLS_SRC_DIR" -GNinja -DCMAKE_INSTALL_PREFIX="$INSTALL_DIR" \
+		-DCMAKE_BUILD_TYPE=Release -DSPIRV_WERROR=OFF
+	cmake --build "$SPIRV_BUILD_DIR" --parallel `nproc`
+	sudo cmake --build "$SPIRV_BUILD_DIR" --target install
+
+	SPIRV_LLVM_BUILD_DIR="$SPIRV_LLVM_SRC_DIR/build"
+	[ -d "$SPIRV_LLVM_SRC_DIR" ] || git clone "$SPIRV_LLVM_SRC_URL" "$SPIRV_LLVM_SRC_DIR"
+	git -C "$SPIRV_LLVM_SRC_DIR" fetch --tags
+	# SPIRV-LLVM-Translator tags track the LLVM major version they build against
+	# (e.g. v22.1.5 for LLVM 22); the hardcoded SPIRV_LLVM_TAG targets Ubuntu's
+	# older LLVM, so resolve the matching tag for the installed LLVM instead.
+	LLVM_MAJOR=$(llvm-config --version | cut -d. -f1)
+	ARCH_SPIRV_LLVM_TAG=$(git -C "$SPIRV_LLVM_SRC_DIR" tag -l "v${LLVM_MAJOR}.*" | sort -V | tail -n1)
+	if [ -z "$ARCH_SPIRV_LLVM_TAG" ]; then
+		echo "No SPIRV-LLVM-Translator tag found for LLVM $LLVM_MAJOR" >&2
+		exit 1
+	fi
+	git -C "$SPIRV_LLVM_SRC_DIR" checkout "$ARCH_SPIRV_LLVM_TAG"
+	LLVM_CMAKE_DIR=$(llvm-config --cmakedir)
+	PKG_CONFIG_PATH="$INSTALL_DIR/lib/pkgconfig" cmake -B "$SPIRV_LLVM_BUILD_DIR" -H"$SPIRV_LLVM_SRC_DIR" -GNinja \
+		-DLLVM_DIR="$LLVM_CMAKE_DIR" -DLLVM_SPIRV_BUILD_EXTERNAL=YES -DLLVM_SPIRV_INCLUDE_TESTS=OFF \
+		-DCMAKE_INSTALL_PREFIX="$INSTALL_DIR" -DCMAKE_BUILD_TYPE=Release
+	cmake --build "$SPIRV_LLVM_BUILD_DIR" --parallel `nproc`
+	sudo cmake --build "$SPIRV_LLVM_BUILD_DIR" --target install
+}
+
+build_mesa_arch() {
+	# $1: The build architecture (i386 or amd64)
+	# $2: Unused environment name, kept for build_mesa compatibility
+	# $3: Unused personality, kept for build_mesa compatibility
+	# $4: The build options
+	LOCAL_BUILD_OPTS="$4"
+	BUILD_DIR="$SRC_DIR/build-$BUILD_ID/$1"
+
+	install_arch_deps
+	install_spirv_deps_arch
+	if [ "$BUILD_DOCS" = "y" ] && [ "$DEPS" = "y" ]; then
+		sudo pacman --needed --noconfirm -S python-clang python-sphinx python-pip
+	fi
+	mkdir -p "$BUILD_DIR"
+	cd "$SRC_DIR"
+
+	if [ "$1" = "i386" ]; then
+		LOCAL_BUILD_OPTS="$LOCAL_BUILD_OPTS -Dlibdir=lib32"
+		# Arch ships no 32-bit clang/llvm dev packages, so iris/anv's CLC support
+		# can't link clangBasic under -m32. Reuse the mesa_clc/vtn_bindgen2 native
+		# tools built by the prior amd64 build instead of relinking clang here.
+		if [ -x "$INSTALL_DIR/bin/mesa_clc" ]; then
+			LOCAL_BUILD_OPTS="$LOCAL_BUILD_OPTS -Dmesa-clc=system"
+			BUILD_ENV="PATH=$INSTALL_DIR/bin:$PATH"
+		else
+			echo "Warning: $INSTALL_DIR/bin/mesa_clc not found; 32-bit build may fail to link clang." >&2
+			BUILD_ENV=""
+		fi
+		# A real cross-file (rather than exporting CFLAGS=-m32 etc. into a
+		# same-arch build) scopes -m32 and pkg-config to the host machine only,
+		# so it correctly reports host_machine.cpu()=i686 (fixing the ICD JSON
+		# name) and doesn't poison native/build-machine tool compilation.
+		CROSS_FILE="$SRC_DIR/build-$BUILD_ID/cross-i686.ini"
+		cat > "$CROSS_FILE" <<-EOF
+			[binaries]
+			c = 'cc'
+			cpp = 'c++'
+			ar = 'ar'
+			strip = 'strip'
+			pkg-config = 'pkg-config'
+
+			[built-in options]
+			c_args = ['-m32']
+			cpp_args = ['-m32']
+			c_link_args = ['-m32']
+			cpp_link_args = ['-m32']
+
+			[properties]
+			# pkg_config_libdir replaces the default search path entirely, so
+			# noarch .pc files (e.g. xorgproto) under /usr/share/pkgconfig must
+			# be listed explicitly or they won't be found at all.
+			pkg_config_libdir = ['/usr/lib32/pkgconfig', '/usr/share/pkgconfig', '$INSTALL_DIR/lib32/pkgconfig']
+
+			[host_machine]
+			system = 'linux'
+			cpu_family = 'x86'
+			cpu = 'i686'
+			endian = 'little'
+		EOF
+		MESON_EXTRA_ARGS="--cross-file=$CROSS_FILE"
+	else
+		LOCAL_BUILD_OPTS="$LOCAL_BUILD_OPTS -Dlibdir=lib -Dinstall-mesa-clc=true"
+		BUILD_ENV="PKG_CONFIG_PATH=$INSTALL_DIR/lib/pkgconfig:$INSTALL_DIR/lib32/pkgconfig"
+		MESON_EXTRA_ARGS=""
+	fi
+	if [ "$BUILD_DOCS" = "y" ]; then
+		LOCAL_BUILD_OPTS="$LOCAL_BUILD_OPTS -Dhtml-docs=enabled"
+	fi
+
+	env $BUILD_ENV meson setup "$BUILD_DIR" $LOCAL_BUILD_OPTS $MESON_EXTRA_ARGS --prefix="$INSTALL_DIR"
+	if [ "$CODE_FORMAT" = "y" ]; then
+		ninja -C "$BUILD_DIR" clang-format
+		return
+	fi
+
+	ninja -C "$BUILD_DIR"
+	if [ "$INSTALL" = "y" ]; then
+		sudo ninja -C "$BUILD_DIR" install
+	fi
+}
+
 build_mesa() {
 	# $1: The schroot architecure
 	# $2: The name of the schroot environment
 	# $3: The schroot personality
 	# $4: The build options
 	# ref: https://unix.stackexchange.com/questions/12956/how-do-i-run-32-bit-programs-on-a-64-bit-debian-ubuntu
+	if [ "$DISTRO_ID" = "arch" ] || [ "$DISTRO_ID" = "cachyos" ]; then
+		build_mesa_arch "$@"
+		return
+	fi
+
 	SCHROOT_PATH="/build/$SUITE/$1"
 	LOCAL_BUILD_OPTS="$4"
 
@@ -354,7 +528,11 @@ EOF
 }
 
 if [ "$DEPLOY" = "y" ]; then
-	sudo service gdm3 stop
+	if [ "$DISTRO_ID" = "arch" ] || [ "$DISTRO_ID" = "cachyos" ]; then
+		sudo systemctl stop display-manager.service || true
+	else
+		sudo service gdm3 stop
+	fi
 
 	if [ -d "/usr/local" ]; then
 		# mesa-builder deploys Mesa by symlinking /usr/local to the install directory
@@ -371,11 +549,24 @@ if [ "$DEPLOY" = "y" ]; then
 	fi
 fi
 
-if [ "$BUILD_32" = "y" ]; then
-	build_mesa "i386" "${SUITE}32" "linux32" "$BUILD_OPTS_32"
+if [ "$DISTRO_ID" = "arch" ] || [ "$DISTRO_ID" = "cachyos" ]; then
+	# amd64 first: it builds mesa_clc/vtn_bindgen2 as native tools that the
+	# i386 build reuses via -Dmesa-clc=system (see build_mesa_arch). Unlike the
+	# Ubuntu path below, this is a real build-order dependency, not just a
+	# preference for which tools end up installed last: i386's meson.build
+	# checks mesa-clc=system by name, and -Dmesa-clc=system means the i386
+	# build never (re)builds or installs those tools, so amd64's stay in place.
+	build_mesa "amd64" "${SUITE}64" "linux" "$BUILD_OPTS"
+	if [ "$BUILD_32" = "y" ]; then
+		build_mesa "i386" "${SUITE}32" "linux32" "$BUILD_OPTS_32"
+	fi
+else
+	if [ "$BUILD_32" = "y" ]; then
+		build_mesa "i386" "${SUITE}32" "linux32" "$BUILD_OPTS_32"
+	fi
+	# build 64 bit last so 64b tools are always installed
+	build_mesa "amd64" "${SUITE}64" "linux" "$BUILD_OPTS"
 fi
-# build 64 bit last so 64b tools are always installed
-build_mesa "amd64" "${SUITE}64" "linux" "$BUILD_OPTS"
 
 if [ "$BUILD_PERFETTO" = "y" ]; then
 	# ref: https://docs.mesa3d.org/perfetto.html

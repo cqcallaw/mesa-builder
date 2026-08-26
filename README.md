@@ -1,5 +1,6 @@
 # Mesa Builder
-Scripts to build and deploy Mesa on Ubuntu using chroot.
+Scripts to build and deploy Mesa on Ubuntu using chroot, or natively on Arch Linux
+and CachyOS.
 
 Builds are deployed to `/usr/local-$(git describe --always --tags)` by default. `/usr/local` is converted to a symlink that points to the most recent build.
 
@@ -26,6 +27,10 @@ Builds are deployed to `/usr/local-$(git describe --always --tags)` by default. 
 # Use an alternate package mirror
 ~/src/mesa-builder/mesa-build.sh --mirror http://linux-ftp.intel.com/pub/mirrors/ubuntu
 
+# On Arch Linux and CachyOS, dependencies are installed with pacman and Mesa is
+# built natively. Enable multilib in /etc/pacman.conf for the default 32-bit build.
+~/src/mesa-builder/mesa-build.sh
+
 # Build a specific Mesa tag (git SHAs work too)
 ~/src/mesa-builder/mesa-build.sh --revision mesa-24.3.4
 
@@ -40,7 +45,7 @@ Builds are deployed to `/usr/local-$(git describe --always --tags)` by default. 
 
 # Install to a temporary directory and don't update the /usr/local path
 # LD_LIBRARY_PATH, LIBGL_DRIVERS_PATH, and VK_ICD_FILENAMES env vars
-# MUST be set properly for workloads to utilize this temporary build 
+# MUST be set properly for workloads to utilize this temporary build
 ~/src/mesa-builder/mesa-build.sh --nodeploy --install /tmp/mesa-wip
 
 # Build without building deps (fast, but may fail)
